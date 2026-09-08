@@ -1,0 +1,28 @@
+# Local Python environment
+.venv/
+__pycache__/
+*.py[cod]
+
+# Firmware build output
+firmware/stampfly/.pio/
+firmware/stampfly/*.bin
+firmware/stampfly/*.elf
+firmware/stampfly/*.map
+generated/
+artifacts/
+
+# Factory flash images are intentionally never committed
+backups/*.bin
+
+# Atom Cam build output
+.lima-home/
+.lima-cache/
+vendor/atomcam_tools/build/
+vendor/atomcam_tools/atomcam_tools.zip
+vendor/atomcam_tools/atomcam_tools-sd-ro.zip
+vendor/atomcam_tools/patches/kernel/zz-camfly-sd-read-only.patch
+vendor/atomcam_tools/rebuild_*.log
+vendor/atomcam_tools/docker-build_*.log
+
+# macOS
+.DS_Store

@@ -1,0 +1,211 @@
+diff --git a/buildscripts/post_image.sh b/buildscripts/post_image.sh
+index d7d1e6a..d04a39d 100755
+--- a/buildscripts/post_image.sh
++++ b/buildscripts/post_image.sh
+@@ -6,6 +6,11 @@ echo "atomcam" > hostname
+ touch authorized_keys
+ cp -dpf uImage.lzma factory_t31_ZMC6tiIDQN
+ mv rootfs.squashfs rootfs_hack.squashfs
+-rm -f /src/atomcam_tools.zip
+-zip -ry /src/atomcam_tools.zip factory_t31_ZMC6tiIDQN rootfs_hack.squashfs hostname authorized_keys
++if [ "${CAMFLY_SD_RO:-0}" = "1" ] ; then
++  archive=/src/atomcam_tools-sd-ro.zip
++else
++  archive=/src/atomcam_tools.zip
++fi
++rm -f "$archive"
++zip -ry "$archive" factory_t31_ZMC6tiIDQN rootfs_hack.squashfs hostname authorized_keys
+ cp -f factory_t31_ZMC6tiIDQN rootfs_hack.squashfs /src/target
+diff --git a/configs/kernel.config b/configs/kernel.config
+index a0c619e..26c7aa3 100644
+--- a/configs/kernel.config
++++ b/configs/kernel.config
+@@ -1989,7 +1989,7 @@ CONFIG_HAVE_ARCH_KGDB=y
+ # CONFIG_TEST_KSTRTOX is not set
+ CONFIG_EARLY_PRINTK=y
+ CONFIG_CMDLINE_BOOL=y
+-CONFIG_CMDLINE="console=ttyS1,115200n8 mem=92M@0x0 rmem=36M@0x5c00000 rdinit=/init mtdparts=jz_sfc:256K(boot),1984K(kernel),3904K(rootfs),3904K(app),1984K(kback),3904K(aback),384K(cfg),64K(para)"
++CONFIG_CMDLINE="console=ttyS1,115200n8 mem=92M@0x0 rmem=36M@0x5c00000 rdinit=/init mtdparts=jz_sfc:256K(boot)ro,1984K(kernel)ro,3904K(rootfs)ro,3904K(app)ro,1984K(kback)ro,3904K(aback)ro,384K(cfg)ro,64K(para)ro"
+ CONFIG_CMDLINE_OVERRIDE=y
+ # CONFIG_DEBUG_STACKOVERFLOW is not set
+ # CONFIG_RUNTIME_DEBUG is not set
+diff --git a/overlay_rootfs/atom_patch/sbin/flash_erase b/overlay_rootfs/atom_patch/sbin/flash_erase
+index e69de29..c912906 100755
+--- a/overlay_rootfs/atom_patch/sbin/flash_erase
++++ b/overlay_rootfs/atom_patch/sbin/flash_erase
+@@ -0,0 +1,3 @@
++#!/bin/sh
++echo "flash_erase: disabled in camfly SD read-only build" >&2
++exit 1
+diff --git a/overlay_rootfs/etc/init.d/S16fwupdate b/overlay_rootfs/etc/init.d/S16fwupdate
+index 0b8be6b..c8fd8f0 100755
+--- a/overlay_rootfs/etc/init.d/S16fwupdate
++++ b/overlay_rootfs/etc/init.d/S16fwupdate
+@@ -1,74 +1,15 @@
+ #!/bin/sh
+-#
+-# build atomcam environment
+-#
+-
+-flash_copy() {
+-  size=`awk '{ if($1 == MTD ":") print ("0x" $2)/1024; }' MTD=${1##*/} /proc/mtd`
+-  echo "flash_copy $1 $2 ${size}"
+-  dd if=$1 of=/tmp/mtd bs=1k count=${size}
+-  [ $? != 0 ] && return
+-
+-  flash_eraseall $2
+-  [ $? != 0 ] && return
+-
+-  flashcp -v /tmp/mtd $2
+-  [ $? != 0 ] && return
+-
+-  rm -f /tmp/mtd
+-}
+-
+-flash_update() {
+-  FWGRADEUP=`awk '/FWGRADEUP=/ { gsub(/^.*=/, ""); print $0; }' /dev/mtd7`
+-  echo "flash_update: " ${FWGRADEUP} >> /media/mmc/update.log
+-
+-  if [ "${FWGRADEUP}" = "kernel+app" ] ; then
+-    flash_copy /dev/mtd4 /dev/mtd1
+-    [ $? != 0 ] && return
+-    flash_copy /dev/mtd5 /dev/mtd3
+-    [ $? != 0 ] && return
+-    flash_eraseall /dev/mtd7
+-  fi
+-
+-  if [ "${FWGRADEUP}" = "kernel+rootfs" ] ; then
+-    flash_copy /dev/mtd4 /dev/mtd1
+-    [ $? != 0 ] && return
+-    flash_copy /dev/mtd5 /dev/mtd2
+-    [ $? != 0 ] && return
+-    flash_eraseall /dev/mtd7
+-    rm -f /media/mmc/atom_root.squashfs
+-  fi
+-
+-  if [ "${FWGRADEUP}" = "kernel" ] ; then
+-    flash_copy /dev/mtd4 /dev/mtd1
+-    [ $? != 0 ] && return
+-    flash_eraseall /dev/mtd7
+-  fi
+-
+-  if [ "${FWGRADEUP}" = "rootfs" ] ; then
+-    flash_copy /dev/mtd5 /dev/mtd2
+-    [ $? != 0 ] && return
+-    flash_eraseall /dev/mtd7
+-  fi
+-
+-  if [ "${FWGRADEUP}" = "app" ] ; then
+-    flash_copy /dev/mtd5 /dev/mtd3
+-    [ $? != 0 ] && return
+-    flash_eraseall /dev/mtd7
+-  fi
+-}
++# Firmware updates are intentionally disabled in the SD read-only build.
+ 
+ case "$1" in
+   start)
+-    flash_update
++    echo "S16fwupdate: disabled in camfly SD read-only build"
++  ;;
++  stop|restart|reload)
+   ;;
+-  stop)
+-	;;
+-  restart|reload)
+-	;;
+   *)
+-	echo "Usage: $0 {start|stop|restart}"
+-	exit 1
++    echo "Usage: $0 {start|stop|restart}"
++    exit 1
+ esac
+ 
+-exit $?
++exit 0
+diff --git a/overlay_rootfs/etc/init.d/S20mountfs b/overlay_rootfs/etc/init.d/S20mountfs
+index 365e10b..fafbeda 100755
+--- a/overlay_rootfs/etc/init.d/S20mountfs
++++ b/overlay_rootfs/etc/init.d/S20mountfs
+@@ -23,14 +23,14 @@ case "$1" in
+   start)
+     ss=`ls -l /media/mmc/atom_root.squashfs | awk '{print $5}'`
+     [ "$ss" = "3997696" ] || dd if=/dev/mtdblock2 of=/media/mmc/atom_root.squashfs bs=16k count=244
+-    mount -t squashfs /media/mmc/atom_root.squashfs /atom
+-    mount -t squashfs /dev/mtdblock3 /atom/system
++    mount -t squashfs -o ro /media/mmc/atom_root.squashfs /atom
++    mount -t squashfs -o ro /dev/mtdblock3 /atom/system
+     [ -f /media/mmc/configs ] || ( dd if=/dev/zero of=/media/mmc/configs bs=1M count=1 && mkfs.ext2 -F /media/mmc/configs )
+     fsck -t ext2 -y /media/mmc/configs
+     mount -t ext2 -o loop /media/mmc/configs /atom/configs
+     if [ ! -f /atom/configs/.product_config -o ! -f /atom/configs/.user_config -o ! -f /atom/configs/app.ver ] ; then
+       echo "rebuild configs" >> /media/mmc/atomhack.log
+-      mount -t jffs2 /dev/mtdblock6 /mnt
++      mount -t jffs2 -o ro /dev/mtdblock6 /mnt
+       cp -p /mnt/.* /mnt/* /atom/configs 2> /dev/null
+       umount /mnt
+     fi
+diff --git a/overlay_rootfs/etc/init.d/S61atomcam b/overlay_rootfs/etc/init.d/S61atomcam
+index 42d46f2..34c2d2d 100755
+--- a/overlay_rootfs/etc/init.d/S61atomcam
++++ b/overlay_rootfs/etc/init.d/S61atomcam
+@@ -29,7 +29,6 @@ case "$1" in
+     mount -o bind /atom/bin/hostapd /atom_patch/bin/hostapd
+     mount -o rbind /atom_patch/bin /atom/bin
+ 
+-    mount -o bind /atom/sbin/flash_erase /atom_patch/sbin/flash_erase
+     mount -o rbind /atom_patch/sbin /atom/sbin
+ 
+     mount -o bind /atom_patch/etc /atom/etc
+@@ -87,8 +86,6 @@ case "$1" in
+     mount | grep '/atom/mnt' && umount /atom/mnt
+     umount /atom/system/bin/restart_wlan0.sh
+     umount /atom/usr/boa/boa
+-    umount /atom_patch/sbin/flash_erase
+-    umount /atom/sbin/flash_erase
+     umount /atom_patch/bin/hostapd
+     umount /atom/bin/hostapd
+     umount /atom_patch/bin/busybox
+diff --git a/overlay_rootfs/etc/init.d/rcS b/overlay_rootfs/etc/init.d/rcS
+index bfa3cee..16bf4ab 100755
+--- a/overlay_rootfs/etc/init.d/rcS
++++ b/overlay_rootfs/etc/init.d/rcS
+@@ -2,6 +2,38 @@
+ 
+ [ -f /etc/environment ] && . /etc/environment
+ 
++mtd_readonly_guard() {
++  # Require the complete source-defined layout; never skip missing flags.
++  for index in 0 1 2 3 4 5 6 7 ; do
++    flags_file=/sys/class/mtd/mtd${index}/flags
++    [ -r "$flags_file" ] || return 1
++    flags=`cat "$flags_file"` || return 1
++    case "$flags" in
++      0x*) digits=${flags#0x} ;;
++      *) return 1 ;;
++    esac
++    case "$digits" in
++      ''|*[!0-9a-fA-F]*) return 1 ;;
++    esac
++    # Linux MTD flags are 32-bit; bound input before shell arithmetic.
++    [ "${#digits}" -le 8 ] || return 1
++    [ $((flags & 1024)) -eq 0 ] || return 1
++  done
++  # Reject unexpected devices as well as an incomplete partition layout.
++  for flags_file in /sys/class/mtd/mtd*/flags ; do
++    case "$flags_file" in
++      /sys/class/mtd/mtd[0-7]/flags) ;;
++      *) return 1 ;;
++    esac
++  done
++  return 0
++}
++
++if ! mtd_readonly_guard ; then
++  echo "MTD read-only guard failed; stopping startup" >&2
++  exit 1
++fi
++
+ # Start all init scripts in /etc/init.d
+ # executing them in numerical order.
+ #

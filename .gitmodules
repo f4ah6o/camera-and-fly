@@ -1,0 +1,6 @@
+[submodule "vendor/M5StampFly"]
+	path = vendor/M5StampFly
+	url = https://github.com/m5stack/M5StampFly.git
+[submodule "vendor/atomcam_tools"]
+	path = vendor/atomcam_tools
+	url = https://github.com/mnakada/atomcam_tools.git

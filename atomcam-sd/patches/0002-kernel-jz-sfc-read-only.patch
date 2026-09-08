@@ -1,0 +1,11 @@
+diff --git a/drivers/mtd/devices/jz_sfc.c b/drivers/mtd/devices/jz_sfc.c
+--- a/drivers/mtd/devices/jz_sfc.c
++++ b/drivers/mtd/devices/jz_sfc.c
+@@ -1220,7 +1220,7 @@
+ 	flash->mtd.owner    = THIS_MODULE;
+ 	flash->mtd.type     = MTD_NORFLASH;
+-	flash->mtd.flags    = MTD_CAP_NORFLASH;
++	flash->mtd.flags    = MTD_CAP_NORFLASH & ~MTD_WRITEABLE;
+ 	flash->mtd.erasesize    = board_info->erasesize;
+ 	flash->mtd.writesize    = board_info->pagesize;
+ 	flash->addr_len     = board_info->addrsize;
