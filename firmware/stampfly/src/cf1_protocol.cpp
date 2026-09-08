@@ -131,6 +131,40 @@ ParseResult parse_line(const char* line, size_t length) {
     return result;
 }
 
+void LineCollector::reset() {
+    length_ = 0;
+    completed_length_ = 0;
+    discarding_ = false;
+    line_[0] = '\0';
+}
+
+LineFeedResult LineCollector::feed(char value) {
+    completed_length_ = 0;
+    if (value == '\r') return LineFeedResult::NONE;
+    if (value == '\n') {
+        if (discarding_) {
+            length_ = 0;
+            discarding_ = false;
+            line_[0] = '\0';
+            return LineFeedResult::LINE_TOO_LONG;
+        }
+        if (length_ == 0) return LineFeedResult::NONE;
+        line_[length_] = '\0';
+        completed_length_ = length_;
+        length_ = 0;
+        return LineFeedResult::LINE_READY;
+    }
+    if (discarding_) return LineFeedResult::NONE;
+    if (length_ + 1 >= kLineCapacity) {
+        length_ = 0;
+        discarding_ = true;
+        line_[0] = '\0';
+        return LineFeedResult::NONE;
+    }
+    line_[length_++] = value;
+    return LineFeedResult::NONE;
+}
+
 const char* error_name(Error error) {
     switch (error) {
         case Error::NONE: return "NONE";

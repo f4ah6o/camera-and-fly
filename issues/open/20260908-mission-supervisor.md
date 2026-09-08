@@ -1,7 +1,7 @@
 # 離陸・保持・着陸ミッションの状態機械を fake 入出力で実装する
 
 Status: open
-Model: unknown
+Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
 Branch: codex/20260908-mission-supervisor
@@ -38,11 +38,11 @@ Branch: codex/20260908-mission-supervisor
 
 ## 受け入れ条件
 
-- [ ] 明示STARTなしにARM/TAKEOFF actionが出ない。
-- [ ] 正常な離陸→保持→着陸→接地→完了系列と各timeout系列を再現できる。
-- [ ] FAULT後の映像復帰/通信再接続でREADYや飛行へ自動復帰しない。
-- [ ] 未校正、unknown telemetry、stale観測、bounds逸脱が状態表どおり処理される。
-- [ ] real adapterは未実装であることをCLI/文書に明示し、fakeミッションで実機I/Oを開かない。
+- [x] 明示STARTなしにARM/TAKEOFF actionが出ない。
+- [x] 正常な離陸→保持→着陸→接地→完了系列と各timeout系列を再現できる。
+- [x] FAULT後の映像復帰/通信再接続でREADYや飛行へ自動復帰しない。
+- [x] 未校正、unknown telemetry、stale観測、bounds逸脱が状態表どおり処理される。
+- [x] real adapterは未実装であることをCLI/文書に明示し、fakeミッションで実機I/Oを開かない。
 
 ## テスト計画
 
@@ -51,6 +51,14 @@ Branch: codex/20260908-mission-supervisor
 ## リスク
 
 本課題の成功はミッション制御フローの検証であり、飛行物理の検証ではない。後続adapterでsemantic actionを既存DISARMへ安易に代入しない。
+
+## 実装記録（2026-09-08）
+
+`host/mission.py` に I/O/sleep を持たない deterministic FSM を実装した。必要 capability、strict health validation、deadline 一致時の timeout、explicit START、latched FAULT、reset 後の再-preflight を持つ。TAKEOFF 完了には target altitude 到達だけでなく `!grounded`、LAND 完了には `grounded && !armed` を必須にした。
+
+`host/tests/test_mission.py` で正常系列、各 active phase timeout、START なし、uncalibrated/unknown telemetry/stale observation/bounds/capability 欠落、FAULT latch、physical feedback requirement を検証した。real ARM/TAKEOFF/LAND adapter は未実装で、`docs/flight-qualification.md` と後続 adapter issue にその境界を明記している。
+
+この acceptance は semantic FSM の完成を示すだけで、実機離陸/着陸の成功を意味しない。
 
 ## 変更履歴
 

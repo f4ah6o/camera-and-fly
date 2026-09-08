@@ -346,6 +346,24 @@ class DryRunSession:
             self.scheduler.fault(reason)
 
 
+
+def require_safe_hardware_status(transport: Any, *, attempts: int = 3, sleep: Callable[[float], None] = time.sleep) -> StampFlyStatus:
+    if type(attempts) is not int or attempts < 1:
+        raise ValueError("attempts must be a positive integer")
+    last_error: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            status = transport.status()
+        except (StampFlyError, OSError, ValueError) as exc:
+            last_error = exc
+            if attempt + 1 < attempts:
+                sleep(0.05)
+            continue
+        if not status.safe_test or not status.claimed:
+            raise IntegrationFault("safe-hardware mode requires safe_test=1 and claimed=1")
+        return status
+    raise IntegrationFault(f"safe-hardware STATUS unavailable after {attempts} attempts: {last_error}")
+
 def _default_status() -> ReplayEvent:
     return ReplayEvent(
         0.0,
@@ -376,6 +394,7 @@ def main() -> int:
     parser.add_argument("--log", type=Path)
     parser.add_argument("--camera-url")
     parser.add_argument("--port")
+    parser.add_argument("--duration", type=float, default=0.0, help="safe-hardware seconds; 0 means until Ctrl-C")
     args = parser.parse_args()
 
     if args.mode == "replay":
@@ -386,6 +405,8 @@ def main() -> int:
 
     if not args.camera_url or not args.port:
         parser.error("--mode safe-hardware requires --camera-url and --port")
+    if not math.isfinite(args.duration) or args.duration < 0:
+        parser.error("--duration must be finite and non-negative")
     # The live mode is deliberately conservative: it only starts after the
     # explicit safe-test status check and never exposes ARM or non-zero SET.
     source = AtomCamSource(args.camera_url)
@@ -396,21 +417,25 @@ def main() -> int:
     try:
         stampfly = StampFly(args.port)
         stampfly.connect()
-        status = stampfly.status()
-        if not status.safe_test or not status.claimed:
-            raise IntegrationFault("safe-hardware mode requires safe_test=1 and claimed=1")
+        status = require_safe_hardware_status(stampfly)
         adapter = SafeZeroAdapter(stampfly)
         scheduler = ControlScheduler(adapter, local_watchdog_seconds=0.2)
         worker.start()
         print("safe-hardware mode started; ARM is unavailable and all SET values are zero", flush=True)
         sequence = 0
         last_tick: float | None = None
-        next_status = time.monotonic()
-        while True:
+        started_at = time.monotonic()
+        next_status = started_at
+        tick_periods: list[float] = []
+        camera_gaps = 0
+        while args.duration <= 0 or time.monotonic() - started_at < args.duration:
             cycle_started = time.monotonic()
-            if last_tick is not None and cycle_started - last_tick > 0.2:
-                scheduler.fault("safe_hardware_tick_late")
-                raise IntegrationFault("safe-hardware control tick exceeded 200 ms")
+            if last_tick is not None:
+                period = cycle_started - last_tick
+                tick_periods.append(max(0.0, period))
+                if period > 0.2:
+                    scheduler.fault("safe_hardware_tick_late")
+                    raise IntegrationFault("safe-hardware control tick exceeded 200 ms")
             last_tick = cycle_started
             sequence += 1
             scheduler.publish(ControlIntent.zero(sequence=sequence, now=cycle_started))
@@ -419,6 +444,8 @@ def main() -> int:
                 raise IntegrationFault(result.fault_reason or "safe-hardware scheduler fault")
 
             frame = worker.snapshot(now=cycle_started, max_age=0.5)
+            if not frame.valid:
+                camera_gaps += 1
             status_error: str | None = None
             if cycle_started >= next_status:
                 try:
@@ -453,6 +480,25 @@ def main() -> int:
                 }
             )
             time.sleep(max(0.0, 0.05 - (time.monotonic() - cycle_started)))
+        ended_at = time.monotonic()
+        summary = IntegrationSummary(
+            schema_version=1,
+            session_id="safe-hardware",
+            state=IntegrationState.STOPPED.value,
+            duration_seconds=max(0.0, ended_at - started_at),
+            ticks=sequence,
+            tick_period_max_seconds=max(tick_periods) if tick_periods else None,
+            tick_period_p95_seconds=_p95(tick_periods),
+            camera_gaps=camera_gaps,
+            fault_reasons=[],
+            set_count=len(adapter.commands),
+            arm_count=0,
+            disarm_count=0,
+        )
+        if args.log is not None:
+            summary_path = args.log.with_suffix(args.log.suffix + ".summary.json")
+            summary_path.write_text(json.dumps(summary.to_dict(), indent=2) + "\n")
+        print(json.dumps(summary.to_dict(), indent=2), flush=True)
     except KeyboardInterrupt:
         return 130
     except (StampFlyError, IntegrationFault, OSError, ValueError) as exc:

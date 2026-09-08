@@ -7,6 +7,7 @@ namespace cf1 {
 
 constexpr uint32_t kControlTimeoutMs = 250;
 constexpr uint32_t kFirstSequence = 1;
+constexpr size_t kLineCapacity = 192;
 
 enum class Command : uint8_t {
     UNKNOWN,
@@ -58,6 +59,31 @@ struct ParseResult {
 
 ParseResult parse_line(const char* line, size_t length);
 const char* error_name(Error error);
+
+enum class LineFeedResult : uint8_t {
+    NONE,
+    LINE_READY,
+    LINE_TOO_LONG,
+};
+
+// Bounded CR/LF line collector shared by Arduino integration and native tests.
+// Once a line exceeds kLineCapacity, every byte through the next newline is
+// discarded so a suffix such as "CF1 ARM" can never become a new command.
+class LineCollector {
+   public:
+    void reset();
+    LineFeedResult feed(char value);
+
+    const char* line() const { return line_; }
+    size_t length() const { return completed_length_; }
+    bool discarding() const { return discarding_; }
+
+   private:
+    char line_[kLineCapacity] = {};
+    size_t length_ = 0;
+    size_t completed_length_ = 0;
+    bool discarding_ = false;
+};
 
 // Session state is independent from Arduino and can be tested on a native
 // host.  It owns only claim/sequence/freshness/ARM preconditions; the flight

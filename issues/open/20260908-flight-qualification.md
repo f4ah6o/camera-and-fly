@@ -1,7 +1,7 @@
 # 安定自動飛行の制御器設計と段階試験の合格基準を確定する
 
 Status: open
-Model: unknown
+Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
 Branch: codex/20260908-flight-qualification
@@ -39,9 +39,9 @@ Branch: codex/20260908-flight-qualification
 
 ## 受け入れ条件
 
-- [ ] 遅延/精度予算と評価条件に調査結果が引用され、未確認を明示している。
-- [ ] 各段階に合否・次段階への条件・中止条件があり、シミュレーションと実機を区別する。
-- [ ] 制御器・adapter・flightビルド・試験の後続イシューが作成されている。
+- [x] 遅延/精度予算と評価条件に調査結果が引用され、未確認を明示している。
+- [x] 各段階に合否・次段階への条件・中止条件があり、シミュレーションと実機を区別する。
+- [x] 制御器・adapter・flightビルド・試験の後続イシューが作成されている。
 - [ ] 安定性の定量目標、反復数、失敗ログを含む集計方法が確定している。
 
 ## テスト計画
@@ -51,6 +51,16 @@ Branch: codex/20260908-flight-qualification
 ## リスク
 
 小型機は電池・重量・床面・地面効果に敏感。単一条件の反復成功は全環境での安定性保証ではない。開始案の数値を実測根拠なしに既定の安全限界にしない。
+
+## 実装記録（2026-09-08）
+
+`docs/flight-qualification.md` に現在の evidence budget と G0〜G5 gate を更新した。Atom Cam JPEG は 64.108 秒で 13 frame、0.203 fps、request p95 5.145 秒のため closed-loop input として reject。safe-hardware G2 は 600.011 秒、11,169 zero SET、ARM=0、fault=0、tick p95 約55.05 ms / max 約79.55 ms を記録した。ただし USB tethered zero-output integration の証拠に限定し、free-flight evidence とは扱わない。
+
+`host/qualification.py` と `host/tests/test_qualification.py` を追加した。評価器は completed/aborted/failed/missing outcome を同じ run 集合で集計し、horizontal/altitude p95/max、success rate、連続完遂数、age/period、saturation、fault を出力する。criteria 未指定では `qualified=null` とし、計画上の候補値を既定の flight limit にしない。専用5テストが成功した。
+
+後続課題を作成した：`20260908-flight-dynamics-simulator.md`、`20260908-outer-position-controller.md`、`20260908-flight-adapter-integration.md`、`20260908-flight-build-preflight.md`、`20260908-staged-flight-test.md`。
+
+定量 flight criteria の最終確定は low-latency stream、calibrated pose error、free-flight link、telemetry validity、altitude/LAND adapter の実測後であるため、最後の acceptance は未達のまま残す。
 
 ## 変更履歴
 

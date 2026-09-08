@@ -1,7 +1,7 @@
 # 自由飛行用の Mac–StampFly 制御リンクを選定する
 
 Status: open
-Model: unknown
+Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
 Branch: codex/20260908-flight-link-design
@@ -39,8 +39,16 @@ USB 接続は自由飛行の機械的制約になる。単に Wi-Fi socket を�
 
 - [ ] 採用方式と不採用理由が記録され、必要な機材と未所持のものが明確。
 - [ ] 遅延と欠損の実測があり、250 ms期限との適合を評価している。
-- [ ] 単一所有者、session再作成、古いpacket拒否、緊急停止の仕様がある。
-- [ ] 後続イシューが確定した wire format/ファイル/異常系テストを含む。
+- [x] 単一所有者、session再作成、古いpacket拒否、緊急停止の仕様がある。
+- [x] 後続イシューが確定した wire format/ファイル/異常系テストを含む。
+
+## 調査・実装記録（2026-09-08）
+
+- `rc.cpp` の既存ESP-NOW packet/ownershipを確認し、USB claim中はESP-NOW入力を無視する既存fenceを維持した。
+- legacy packetが25 byte固定offsetを長さ確認なしで読む点と、不正packetがfreshness/peer学習へ影響し得る点を修正。`legacy_rc_protocol.*` をpure parserとして追加し、length/target/checksum/non-finite/modeを適用前に検証する。native testと`camfly-safe` buildは成功。
+- `docs/flight-link-design.md` にUDP/TCP直結と外付けESP32 gateway→ESP-NOWを比較。現時点の優先測定候補は外付けESP32 gatewayだが、現在のtest setupには第2USB ESP32が列挙されていないため最終採用は保留。
+- session/sequence/TTL/application ACK/claim/release/disarm/auth/単一owner/reconnect disarmの仕様境界を記録。後続は [ESP-NOW gateway flight link](20260908-espnow-gateway-flight-link.md)。
+- 実gatewayでの20 Hz・latency/loss・400 Hz loop負荷測定がないため、採用方式と250 ms適合の受け入れ条件は未完了のまま維持する。
 
 ## テスト計画
 

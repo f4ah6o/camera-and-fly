@@ -108,6 +108,69 @@ class StampFlyTests(unittest.TestCase):
         with self.assertRaises(StampFlyError):
             client.hello()
 
+    def test_partial_lines_and_many_delayed_acks_remain_bounded(self):
+        class NoisySerial(FakeSerial):
+            def write(self, payload):
+                self.writes.append(payload.decode())
+                command = payload.decode().strip()
+                if command == "CF1 HELLO":
+                    for sequence in range(200):
+                        self.rx.append(f"CF1 OK {sequence}\r\n".encode())
+                    self.rx.append(b"CF1 HELLO stampfly-camfly/2\r\n")
+                return len(payload)
+
+        fake = NoisySerial()
+        client = StampFly("fake", serial_instance=fake, sleep=lambda _: None, max_rx_line_bytes=128)
+        self.assertEqual(client.hello(), "CF1 HELLO stampfly-camfly/2")
+        self.assertLessEqual(len(client._rx_buffer), 128)
+
+    def test_overlong_received_line_is_rejected_and_buffer_cleared(self):
+        class OverlongSerial(FakeSerial):
+            def write(self, payload):
+                self.writes.append(payload.decode())
+                self.rx.append(b"X" * 96 + b"\n")
+                return len(payload)
+
+        fake = OverlongSerial()
+        client = StampFly("fake", serial_instance=fake, sleep=lambda _: None, max_rx_line_bytes=64)
+        with self.assertRaises(ProtocolError):
+            client.hello()
+        self.assertEqual(client._rx_buffer, bytearray())
+
+    def test_serial_read_disconnect_is_failure(self):
+        class DisconnectSerial(FakeSerial):
+            def read(self, size):
+                raise OSError("disconnected")
+
+        fake = DisconnectSerial()
+        client = StampFly("fake", serial_instance=fake, sleep=lambda _: None)
+        with self.assertRaises(StampFlyError):
+            client.hello()
+
+    def test_missing_response_times_out_with_bounded_buffer(self):
+        class SilentSerial(FakeSerial):
+            def write(self, payload):
+                self.writes.append(payload.decode())
+                return len(payload)
+
+        clock = Clock()
+        fake = SilentSerial()
+
+        def advance(delay):
+            clock.value += max(delay, 0.001)
+
+        client = StampFly(
+            "fake",
+            serial_instance=fake,
+            clock=clock.now,
+            sleep=advance,
+            response_timeout=0.01,
+            max_rx_line_bytes=64,
+        )
+        with self.assertRaises(ProtocolError):
+            client.hello()
+        self.assertLessEqual(len(client._rx_buffer), 64)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -162,13 +162,33 @@ zero SET packets after confirming `safe_test=1`:
 It has no ARM path and should only be used with the documented motor-stop
 preconditions.
 
+## Qualification log evaluation
+
+`host/qualification.py` evaluates hardware-free schema-v1 qualification JSONL.
+It reports position-error p95/max, run outcomes including aborted/failed runs,
+validity gaps, age/period, saturation, and consecutive completions. It embeds
+no default flight limits: without an explicit criteria JSON, `qualified` is
+`null`. This prevents planning targets from becoming accidental flight
+authorization.
+
+~~~sh
+.venv/bin/python -m unittest host.tests.test_qualification -v
+.venv/bin/python host/qualification.py /path/to/qualification.jsonl \
+  --criteria /path/to/reviewed-criteria.json
+~~~
+
+See `docs/flight-qualification.md` for the G0-G5 gate and the remaining
+low-latency camera, calibration, free-flight link, altitude/LAND, and flight
+build prerequisites.
+
 ## SD runtime deployment
 
 `host/camera_deploy.py` supports explicit `inspect`, `stage`, `activate`,
 `status`, and `rollback` operations. Every call requires a known-hosts file,
 expected original-camera MAC, and expected model. It uses strict SSH host-key
-checking, versioned releases under the SD card, manifest hashes, atomic
-active/previous markers, and no automatic restart/reboot. Use `--dry-run` to
+checking, versioned releases under the SD card, manifest hashes, same-SD
+rename+sync active/previous markers, and no automatic restart/reboot. These
+markers are not claimed to be power-loss atomic. Use `--dry-run` to
 validate a local bundle and show the operation without SSH writes. It never
 updates internal camera flash.
 

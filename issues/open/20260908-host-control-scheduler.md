@@ -1,7 +1,7 @@
 # ホストの周期送信と watchdog を映像・STATUS 待ちから分離する
 
 Status: open
-Model: unknown
+Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
 Branch: codex/20260908-host-control-scheduler
@@ -38,11 +38,11 @@ ARM の自動化、位置制御、ネットワーク transport の実装。
 
 ## 受け入れ条件
 
-- [ ] 201 ms の停止後、次の通常 SET を送る前に local watchdog が失敗する。
-- [ ] producer が停止した時、送信 thread が生きていても期限を過ぎた非ゼロ指令を再送しない。
-- [ ] 2秒のカメラ待ち、STATUS timeout、ログ出力停滞が古い指令の延命にならない。
-- [ ] 欠損/不正 STATUS、部分行、大量 ACK、切断を bounded memory で処理できる。
-- [ ] 既存の zero controller は ARM を送らず正常終了時と異常時の所有権仕様を維持する。
+- [x] 201 ms の停止後、次の通常 SET を送る前に local watchdog が失敗する。
+- [x] producer が停止した時、送信 thread が生きていても期限を過ぎた非ゼロ指令を再送しない。
+- [x] 2秒のカメラ待ち、STATUS timeout、ログ出力停滞が古い指令の延命にならない。
+- [x] 欠損/不正 STATUS、部分行、大量 ACK、切断を bounded memory で処理できる。
+- [x] 既存の zero controller は ARM を送らず正常終了時と異常時の所有権仕様を維持する。
 
 ## テスト計画
 
@@ -51,6 +51,14 @@ ARM の自動化、位置制御、ネットワーク transport の実装。
 ## リスク
 
 Python thread はハードリアルタイムではない。専用 thread を追加してもブロック中の OS/driver を止められるとは限らず、firmware watchdog の独立性が必要。
+
+## 実装記録（2026-09-08）
+
+`host/control_loop.py` に immutable `ControlIntent`、one-slot latest mailbox、pre-send local watchdog、fault latch、single transport owner を実装した。201 ms scheduler stall と stopped producer の stale non-zero intent は専用 unit test で、SET 前に fault/disarm して再送しないことを検証した。
+
+Camera blocking I/O は `CameraWorker` に分離され、replay の 2 秒 frame gap と実カメラ約5.15秒 request 中も safe-hardware scheduler は継続した。10分 run の tick max は約79.55 ms。STATUS は bounded response timeout、ログ stall 後は次 SET 前の local watchdog で検出される。
+
+`host/tests/test_stampfly.py` に missing response timeout、1-byte相当の partial line、200件の delayed ACK、overlong RX line、serial read disconnect、short write を追加し、bounded buffer/timeout/fault handling を検証した。
 
 ## 変更履歴
 

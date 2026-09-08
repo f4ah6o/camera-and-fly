@@ -1,7 +1,7 @@
 # 固定カメラによる機体位置推定の方式と精度を調査する
 
 Status: open
-Model: unknown
+Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
 Branch: codex/20260908-vision-localization-design
@@ -42,6 +42,14 @@ Branch: codex/20260908-vision-localization-design
 - [ ] 最低3高さ×5平面位置と複数yawで誤差/欠損/遅延を測定する。
 - [ ] 遮蔽と誤IDを無効観測として扱い、単眼推定の限界を明示する。
 - [ ] 採否理由と確定した閾値を含む後続実装イシューがある。
+
+## 実装・調査記録（2026-09-08）
+
+- StampFly source の座標軸を確認：+X前、+Y右、+Z下、正roll=左肩上がり、正pitch=頭上げ、正yaw=上から見て右回り。`docs/vision-design.md` と `host/vision.py` の `body_frd` / `world_frd` に固定した。
+- `PoseObservation`、strict sequence gate、source/receive freshness、marker count、reprojection error、confidence、room bounds のpure quality gateを実装。source timestamp unknownもfail closedする。fixtureテストはdeterministicにPASS。
+- JPEG snapshotは実測p95約5.145秒のため閉ループ入力から除外。[低遅延RTSP/WebRTC](20260908-camera-low-latency-stream.md) が先行blocker。
+- 現`.venv`にはOpenCV/AprilTag bindingがない。decoder/detectorは一次資料・arm64互換性・実測を確認してから固定するため、現時点では推測導入していない。
+- 物理方向確認、3高さ×5位置、遮蔽/blur/dropout実測は未実施なので該当acceptanceはopenのまま。
 
 ## テスト計画
 

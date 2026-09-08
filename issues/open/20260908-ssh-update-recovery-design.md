@@ -1,7 +1,7 @@
 # SSH 経由の起動イメージ更新と復旧方式を調査する
 
 Status: open
-Model: unknown
+Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
 Branch: codex/20260908-ssh-update-recovery-design
@@ -37,10 +37,10 @@ Atom Cam 1 の SD カーネル/rootfs を SSH から更新するため、実際�
 
 ## 受け入れ条件
 
-- [ ] 実測とソース由来と未確認情報を区別した設計文書がある。
-- [ ] SSH が戻らない場合も含む復旧手順が記載され、原子性の保証範囲が明確。
-- [ ] SD と内部 flash の境界が明記され、MTD 書き込みを要求しない。
-- [ ] 後続実装イシューが作成され、調査文書へ相互リンクされている。
+- [x] 実測とソース由来と未確認情報を区別した設計文書がある。
+- [x] SSH が戻らない場合も含む復旧手順が記載され、原子性の保証範囲が明確。
+- [x] SD と内部 flash の境界が明記され、MTD 書き込みを要求しない。
+- [x] 後続実装イシューが作成され、調査文書へ相互リンクされている。
 
 ## テスト計画
 
@@ -49,6 +49,22 @@ Atom Cam 1 の SD カーネル/rootfs を SSH から更新するため、実際�
 ## リスク
 
 単一 kernel ファイルの置換は rootfs A/B だけでは復旧できない。SD ファイルシステムの rename と停電耐性を同一視しない。
+
+## 実装記録（2026-09-08）
+
+`docs/ssh-update-design.md` を pinned source に基づいて更新し、1/2 partition 分岐、rootfs/kernel の逐次 `mv` + `sync`、`switch_root` 後の `/media/mmc`、SD-backed SSH/config 領域、固定 kernel 名による rollback 限界を記録した。実機で未測定の filesystem/layout、bootloader、power-loss durability は明示的に unknown のまま残した。
+
+SSH が戻らない場合は offline SD recovery が必要であり、内部 MTD write を復旧手段にしない。boot-image update は atomic と主張しない。
+
+後続課題を作成した：
+
+- `20260908-atomcam-boot-layout-inspection.md`
+- `20260908-initramfs-rootfs-selector.md`
+- `20260908-boot-image-deploy-cli.md`
+- `20260908-boot-health-rollback.md`
+- `20260908-sd-recovery-powerloss-test.md`
+
+これらの hardware-dependent acceptance は real-device evidence が得られるまで未達。boot-image の実機更新/reboot/rollback/power-loss test は今回実施していない。
 
 ## 変更履歴
 

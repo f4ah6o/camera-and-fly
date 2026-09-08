@@ -29,6 +29,7 @@
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include "flight_control.hpp"
+#include "legacy_rc_protocol.hpp"
 
 // esp_now_peer_info_t slave;
 
@@ -51,11 +52,21 @@ void on_esp_now_sent(const uint8_t *mac_addr, esp_now_send_status_t status);
 // 受信コールバック
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *recv_data, int data_len) {
     if (usb_bridge_claimed()) return;
-    Connect_flag = 0;
 
-    uint8_t *d_int;
-    // int16_t d_short;
-    float d_float;
+    const uint8_t target_tail[3] = {MyMacAddr[3], MyMacAddr[4], MyMacAddr[5]};
+    legacy_rc::Packet packet;
+    const legacy_rc::Error parse_error =
+        legacy_rc::parse(recv_data, data_len < 0 ? 0U : static_cast<size_t>(data_len), target_tail, &packet);
+    if (parse_error != legacy_rc::Error::NONE) {
+        Rc_err_flag = 1;
+        return;
+    }
+
+    // Only a fully validated packet refreshes receiver freshness or teaches
+    // the telemetry peer. Short, malformed, wrong-target, and bad-checksum
+    // packets cannot keep the legacy radio link alive.
+    Connect_flag = 0;
+    Rc_err_flag = 0;
 
     if (!TelemAddr[0] && !TelemAddr[1] && !TelemAddr[2] && !TelemAddr[3] && !TelemAddr[4] && !TelemAddr[5]) {
         memcpy(TelemAddr, mac_addr, 6);
@@ -74,69 +85,16 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *recv_data, int data_len)
     Recv_MAC[1] = recv_data[1];
     Recv_MAC[2] = recv_data[2];
 
-    if ((recv_data[0] == MyMacAddr[3]) && (recv_data[1] == MyMacAddr[4]) && (recv_data[2] == MyMacAddr[5])) {
-        Rc_err_flag = 0;
-    } else {
-        Rc_err_flag = 1;
-        return;
-    }
-
-    // checksum
-    uint8_t check_sum = 0;
-    for (uint8_t i = 0; i < 24; i++) check_sum = check_sum + recv_data[i];
-    // if (check_sum!=recv_data[23])USBSerial.printf("checksum=%03d recv_sum=%03d\n\r", check_sum, recv_data[23]);
-    if (check_sum != recv_data[24]) {
-        Rc_err_flag = 1;
-        return;
-    }
-
-    d_int         = (uint8_t *)&d_float;
-    d_int[0]      = recv_data[3];
-    d_int[1]      = recv_data[4];
-    d_int[2]      = recv_data[5];
-    d_int[3]      = recv_data[6];
-    Stick[RUDDER] = d_float;
-
-    d_int[0]        = recv_data[7];
-    d_int[1]        = recv_data[8];
-    d_int[2]        = recv_data[9];
-    d_int[3]        = recv_data[10];
-    Stick[THROTTLE] = d_float;
-
-    d_int[0]       = recv_data[11];
-    d_int[1]       = recv_data[12];
-    d_int[2]       = recv_data[13];
-    d_int[3]       = recv_data[14];
-    Stick[AILERON] = d_float;
-
-    d_int[0]        = recv_data[15];
-    d_int[1]        = recv_data[16];
-    d_int[2]        = recv_data[17];
-    d_int[3]        = recv_data[18];
-    Stick[ELEVATOR] = d_float;
-
-    Stick[BUTTON_ARM]     = recv_data[19];  // auto_up_down_status
-    Stick[BUTTON_FLIP]    = recv_data[20];
-    Stick[CONTROLMODE]    = recv_data[21];  // Mode:rate or angle control
-    Stick[ALTCONTROLMODE] = recv_data[22];  // 高度制御
-
-    ahrs_reset_flag = recv_data[23];
-
+    Stick[RUDDER] = packet.rudder;
+    Stick[THROTTLE] = packet.throttle;
+    Stick[AILERON] = packet.aileron;
+    Stick[ELEVATOR] = packet.elevator;
+    Stick[BUTTON_ARM] = packet.button_arm;
+    Stick[BUTTON_FLIP] = packet.button_flip;
+    Stick[CONTROLMODE] = packet.control_mode;
+    Stick[ALTCONTROLMODE] = packet.alt_mode;
+    ahrs_reset_flag = packet.ahrs_reset;
     Stick[LOG] = 0.0;
-    // if (check_sum!=recv_data[23])USBSerial.printf("checksum=%03d recv_sum=%03d\n\r", check_sum, recv_data[23]);
-
-#if 0
-  USBSerial.printf("%6.3f %6.3f %6.3f %6.3f %6.3f %6.3f %6.3f %6.3f  %6.3f\n\r", 
-                                            Stick[THROTTLE],
-                                            Stick[AILERON],
-                                            Stick[ELEVATOR],
-                                            Stick[RUDDER],
-                                            Stick[BUTTON_ARM],
-                                            Stick[BUTTON_FLIP],
-                                            Stick[CONTROLMODE],
-                                            Stick[ALTCONTROLMODE],
-                                            Stick[LOG]);
-#endif
 }
 
 // 送信コールバック

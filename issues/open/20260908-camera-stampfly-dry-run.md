@@ -1,7 +1,7 @@
 # カメラ入力と StampFly をモーター停止状態で統合する
 
 Status: open
-Model: unknown
+Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
 Branch: codex/20260908-camera-stampfly-dry-run
@@ -37,11 +37,11 @@ Branch: codex/20260908-camera-stampfly-dry-run
 
 ## 受け入れ条件
 
-- [ ] replay は camera/serial 接続なしで同じ入力から同じ状態遷移を再現する。
-- [ ] 全試験で ARM が0件、hardware SET の全制御値が0であることを wire log で確認する。
-- [ ] camera の2秒停止が serial loop の2秒停止にならない。
-- [ ] serial停止・stale intent・不正 STATUS で fault を latch し、復帰で自動再開しない。
-- [ ] safe 実機で10分間の連携ログと欠損注入結果を保存する。
+- [x] replay は camera/serial 接続なしで同じ入力から同じ状態遷移を再現する。
+- [x] 全試験で ARM が0件、hardware SET の全制御値が0であることを wire log で確認する。
+- [x] camera の2秒停止が serial loop の2秒停止にならない。
+- [x] serial停止・stale intent・不正 STATUS で fault を latch し、復帰で自動再開しない。
+- [x] safe 実機で10分間の連携ログと欠損注入結果を保存する。
 
 ## テスト計画
 
@@ -50,6 +50,14 @@ Branch: codex/20260908-camera-stampfly-dry-run
 ## リスク
 
 ゼロ SET が継続する試験は飛行制御の安定性の証明にはならない。カメラの通信復旧とミッション再開を区別する。
+
+## 実装記録（2026-09-08）
+
+`host/integration.py` の replay / safe-hardware、zero-only `SafeZeroAdapter`、bounded JSONL、run summary、initial STATUS retry、`--duration` を実装した。replay では2秒 camera gap、serial error、不正 `safe_test` STATUS を fault injection し、ARM API を adapter に公開していない。
+
+識別済み StampFly を明示 port で使用した 600.011 秒 safe-hardware run は 11,169 SET、全 zero、ARM=0、DISARM=0、fault=0。tick p95 は約55.05 ms、max 約79.55 ms。camera gap は10,091 tickで、低速 JPEG request が scheduler を同じ長さだけ停止させないことを実測した。ログは `artifacts/20260908-camfly-safe-hardware-10m.jsonl` と summary JSON に保存した。
+
+これは motor-stopped integration の合格であり、camera freshness、自由飛行 transport、位置制御、実飛行の合格ではない。
 
 ## 変更履歴
 

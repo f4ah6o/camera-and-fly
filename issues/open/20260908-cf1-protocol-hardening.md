@@ -1,7 +1,7 @@
 # CF1 の入力検証・鮮度・処理時間を堅牢化する
 
 Status: open
-Model: unknown
+Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
 Branch: codex/20260908-cf1-protocol-hardening
@@ -37,11 +37,11 @@ NaN は clamp を通過でき、余剰 token と不正 mode も明確に拒否�
 
 ## 受け入れ条件
 
-- [ ] NaN/Inf、余剰 token、不正 mode、範囲外、duplicate/stale sequence は ERR となり Stick/鮮度を更新しない。
-- [ ] CLAIM→ARM と RELEASE→CLAIM→ARM は新 SET なしで拒否される。
-- [ ] overlong 行の末尾の ARM は実行されず、次の正常行は復帰できる。
+- [x] NaN/Inf、余剰 token、不正 mode、範囲外、duplicate/stale sequence は ERR となり Stick/鮮度を更新しない。
+- [x] CLAIM→ARM と RELEASE→CLAIM→ARM は新 SET なしで拒否される。
+- [x] overlong 行の末尾の ARM は実行されず、次の正常行は復帰できる。
 - [ ] 受信洪水と TX 停滞時にも watchdog 判定へ到達する。
-- [ ] native テストと camfly-safe ビルドが成功し、safe PWM のゼロ固定が保持される。
+- [x] native テストと camfly-safe ビルドが成功し、safe PWM のゼロ固定が保持される。
 
 ## テスト計画
 
@@ -50,6 +50,14 @@ NaN は clamp を通過でき、余剰 token と不正 mode も明確に拒否�
 ## リスク
 
 ERR 増加をホストが古い応答と誤対応しない設計が必要。400 Hz と USB TX の相互作用は native テストだけでは保証できない。
+
+## 実装記録（2026-09-08）
+
+`cf1_protocol.{hpp,cpp}` に Arduino 非依存 parser/session/LineCollector を実装し、SET の厳密 token/finite/range/mode/sequence 検証、CLAIM 時 freshness reset、uint32 sequence exhaustion、250 ms watchdog 境界、overlong discard-until-newline を native test で検証した。`usb_bridge.cpp` は 1 poll 96 byte の RX budget と `availableForWrite()` を使う bounded/nonblocking TX gate を持ち、watchdog を RX 処理の前後で評価する。
+
+`camfly-safe` build と safe-hardware 600.011 秒 run が成功し、11,169 SET は全て zero、ARM=0、fault=0。
+
+RX flood/TX 停滞時のコード経路は bounded だが、実 USB で queue-full/TX-stall を能動注入した測定はまだないため、その acceptance は未達として残す。
 
 ## 変更履歴
 

@@ -33,6 +33,32 @@ class ControlLoopTests(unittest.TestCase):
         self.assertEqual(transport.disarms, 1)
         self.assertEqual(len(transport.sets), 1)
 
+    def test_201ms_scheduler_stall_faults_before_next_set(self):
+        transport = FakeTransport()
+        scheduler = ControlScheduler(transport, local_watchdog_seconds=0.2)
+        scheduler.publish(self.intent(sequence=1, now=0.0, ttl=1.0, throttle=0.2))
+        self.assertTrue(scheduler.tick(now=0.0).sent)
+        scheduler.publish(self.intent(sequence=2, now=0.201, ttl=1.0, throttle=0.2))
+        result = scheduler.tick(now=0.201)
+        self.assertEqual(result.state, SchedulerState.FAULT)
+        self.assertEqual(result.fault_reason, "local_watchdog_before_send")
+        self.assertEqual(len(transport.sets), 1)
+        self.assertEqual(transport.disarms, 1)
+
+    def test_stopped_producer_cannot_keep_nonzero_intent_alive(self):
+        transport = FakeTransport()
+        scheduler = ControlScheduler(transport)
+        scheduler.publish(self.intent(sequence=1, now=0.0, ttl=0.16, throttle=0.2))
+        self.assertTrue(scheduler.tick(now=0.00).sent)
+        self.assertTrue(scheduler.tick(now=0.05).sent)
+        self.assertTrue(scheduler.tick(now=0.10).sent)
+        self.assertTrue(scheduler.tick(now=0.15).sent)
+        result = scheduler.tick(now=0.16)
+        self.assertEqual(result.state, SchedulerState.FAULT)
+        self.assertEqual(result.fault_reason, "intent_expired:1")
+        self.assertEqual(len(transport.sets), 4)
+        self.assertEqual(transport.disarms, 1)
+
     def test_reversed_intent_latches(self):
         transport = FakeTransport()
         scheduler = ControlScheduler(transport)

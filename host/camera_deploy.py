@@ -159,6 +159,7 @@ set -eu
 root=/media/mmc/camfly
 action=${1-}
 arg=${2-}
+token=${3-}
 safe_id() {
   case "$1" in
     ''|.*|*[!A-Za-z0-9._-]*) return 1 ;;
@@ -195,21 +196,36 @@ case "$action" in
     ;;
   stage)
     safe_id "$arg"
-    incoming=${3-}
-    [ "$incoming" = "/media/mmc/.camfly-upload-$arg.tar" ]
+    safe_id "$token"
+    incoming=${4-}
+    [ "$incoming" = "/media/mmc/.camfly-upload-$arg-$token.tar" ]
     [ -f "$incoming" ]
     [ -d /media/mmc ]
     mkdir -p "$root"
     acquire_lock
     mkdir -p "$root/.staging" "$root/releases"
     temporary="$root/.staging/$arg.$$"
+    cleanup_stage() {
+      [ -z "$temporary" ] || rm -rf "$temporary"
+      [ -z "$incoming" ] || rm -f "$incoming"
+    }
+    trap 'cleanup_stage; rmdir "$root/.deploy.lock" 2>/dev/null || true' EXIT
     mkdir "$temporary"
     tar -x -f "$incoming" -C "$temporary"
     [ "$(cat "$temporary/manifest.release_id")" = "$arg" ]
     [ -f "$temporary/SHA256SUMS" ]
     (cd "$temporary" && sha256sum -c SHA256SUMS >/dev/null)
-    [ ! -e "$root/releases/$arg" ]
+    if [ -e "$root/releases/$arg" ]; then
+      [ -d "$root/releases/$arg" ] || exit 31
+      cmp -s "$temporary/manifest.release_id" "$root/releases/$arg/manifest.release_id" || exit 31
+      cmp -s "$temporary/manifest.model" "$root/releases/$arg/manifest.model" || exit 31
+      cmp -s "$temporary/manifest.entrypoint" "$root/releases/$arg/manifest.entrypoint" || exit 31
+      cmp -s "$temporary/SHA256SUMS" "$root/releases/$arg/SHA256SUMS" || exit 31
+      (cd "$root/releases/$arg" && sha256sum -c SHA256SUMS >/dev/null) || exit 31
+      exit 0
+    fi
     mv "$temporary" "$root/releases/$arg"
+    temporary=
     rm -f "$incoming"
     sync
     ;;
@@ -279,8 +295,10 @@ class SSHRunner:
             return "DRY_RUN"
         script = REMOTE_SCRIPT.encode("utf-8")
         if action == "stage":
-            release = args[0]
-            remote_path = f"/media/mmc/.camfly-upload-{release}.tar"
+            if len(args) != 2:
+                raise DeployError("stage requires release ID and upload token")
+            release, upload_token = args
+            remote_path = f"/media/mmc/.camfly-upload-{release}-{upload_token}.tar"
             command.extend([remote_path])
             if self.dry_run:
                 return "DRY_RUN"
@@ -414,7 +432,9 @@ class CameraDeployer:
         required_kib = (bundle.total_bytes + 1023) // 1024 + 1024
         if int(info["FREE_KIB"]) < required_kib:
             raise DeployError("remote SD free space is insufficient")
-        return self.runner.run("stage", (bundle.release_id,), make_stage_payload(bundle))
+        payload = make_stage_payload(bundle)
+        upload_token = hashlib.sha256(payload).hexdigest()[:16]
+        return self.runner.run("stage", (bundle.release_id, upload_token), payload)
 
     def activate(self, release_id: str) -> str:
         return self.runner.run("activate", (_safe_release_id(release_id),))

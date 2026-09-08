@@ -1,7 +1,7 @@
 # 高度指令・着陸・故障時動作の機上仕様を確定する
 
 Status: open
-Model: unknown
+Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
 Branch: codex/20260908-altitude-failsafe-design
@@ -37,10 +37,16 @@ Branch: codex/20260908-altitude-failsafe-design
 
 ## 受け入れ条件
 
-- [ ] すべての制御/観測量の単位・符号・鮮度・有効条件をソースに結び付けて記録。
-- [ ] LANDとDISARMが区別され、再送/切断/センサ故障の遷移表がある。
-- [ ] 機上fallbackの実装と有効化を分け、既存safe動作を維持する手順がある。
-- [ ] 後続実装イシューが protocol examples と異常系の受け入れ条件を含む。
+- [x] すべての制御/観測量の単位・符号・鮮度・有効条件をソースに結び付けて記録。
+- [x] LANDとDISARMが区別され、再送/切断/センサ故障の遷移表がある。
+- [x] 機上fallbackの実装と有効化を分け、既存safe動作を維持する手順がある。
+- [x] 後続実装イシューが protocol examples と異常系の受け入れ条件を含む。
+
+## 調査結果（2026-09-08）
+
+`docs/altitude-failsafe-design.md` に source-derived unit/符号/validity、LANDとDISARMの分離、通信・camera・ToF・IMU・battery・bounds・emergencyの遷移表を記録した。現CF1 throttle `[0,1]` は AUTO_ALT の `Alt_ref += thlo * 0.001` に対して負方向を表現できず、metre高度APIではない。yawもabsolute headingではなくrate referenceへ変換される。
+
+後続実装を [高度command API](20260908-altitude-command-api.md)、[telemetry validity](20260908-telemetry-validity.md)、[LAND/failsafe adapter](20260908-landing-failsafe-adapter.md) に分割した。いずれも `camfly-safe` で実装と有効化を分離する。
 
 ## テスト計画
 

@@ -1,7 +1,7 @@
 # SSH 更新・カメラ連携・安定自動飛行の段階的実装計画
 
 Status: open
-Model: unknown
+Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
 Branch: codex/20260908-flight-roadmap
@@ -14,7 +14,7 @@ Atom Cam 1 の SSH 更新と StampFly の映像連携を整備し、測定と段
 
 現行構成は Atom Cam 1 → Mac の映像入力、Mac → USB/CF1 → StampFly の指令。詳細は [README](../../README.md)、[SD ビルド](../../atomcam-sd/README.md)、[ホスト](../../host/controller.py)、[CF1](../../firmware/stampfly/src/usb_bridge.cpp)。
 
-2026-09-08 時点：`camfly-safe` 書き込み済みで全モーター PWM はゼロ固定。飛行用カスタムビルドは未作成。カメラは SD 起動、Web UI、SSH を一度確認したが映像遅延は未評価。カメラの MAC は未記録、過去に記録された IP アドレスは本人性を保証しない。通常 SD イメージと読み取り専用派生イメージを混同しない。
+2026-09-08 時点：`camfly-safe` 書き込み済みで全モーター PWM はゼロ固定。飛行用カスタムビルドは未作成。カメラは SD 起動、Web UI、SSH を一度確認済み。JPEG snapshot は64.108秒実測して0.203 fps、request p95 5.145秒のため closed-loop input として不採用。RTSP/WebRTC の低遅延測定は未実施。対象カメラの identity はoperatorが別途確認するが、device-specific network identity は公開repoへ記録しない。過去の IP アドレスだけを本人性根拠にしない。通常 SD イメージと読み取り専用派生イメージを混同しない。
 
 計画開始時の未コミット変更は `atomcam-sd/README.md`、`atomcam-sd/patches/0001-source-read-only.patch`、`atomcam-sd/tests/`。MTD ガードの強化であり保持する。既存 ZIP はこの修正を含まない。
 
@@ -94,18 +94,24 @@ Atom Cam 1 の SSH 更新と StampFly の映像連携を整備し、測定と段
 
 ## 実装記録（2026-09-08）
 
-依存しないソフトウェア部分を先行実装した。親イシューは open のままとし、実機の合否をコードテストで代替しない。
+依存しない software/safe-hardware 部分を先行実装した。親イシューは open のままとし、実機未達を unit test で代替しない。
 
-- A1: `atomcam-sd/build.sh` の release ID、衝突拒否、submodule lock/cleanup、ZIP verifier、builder rootfs/kernel evidence を実装した。生成した成果物と build log はローカルの `artifacts/` に保存したが、device-specific な成果物は公開リポジトリへ含めない。`source_evidence.all_checked_passed=true`。既存の通常 ZIP と旧 read-only ZIP は上書きしていない。
-- A2: `host/camera_deploy.py` に strict known-hosts SSH、MAC/model/hash-tool preflight、manifest/hash 検証、stage/activate/status/rollback、same-SD marker rollback、remote lock、fake runner を追加した。実機 SSH の v1→v2→rollback は未実施。
-- B1: CF1 parser/session を Arduino 非依存に分離し、有限値・厳密 token 数・sequence freshness・claim reset・250 ms watchdog・overlong discard・poll byte budget・nonblocking TX gate を追加した。native test と `camfly-safe` build が成功した。
-- B2: `host/control_loop.py` の immutable expiring intent、single-owner scheduler、latest mailbox、pre-send watchdog、fault latch を `controller.py` と `stampfly.py` に接続した。
-- B3: JPEG response bound、同一 host redirect、frame clocks、latest-frame worker、probe 分位点計測、camera fixture tests を追加した。実カメラの exposure-to-receive は未測定。
-- C1/D1: `host/integration.py` の既定 replay、zero-only safe adapter、bounded JSONL、fault injection と、実 I/O を持たない `host/mission.py` の明示 START/TAKEOFF/LAND FSM を追加した。`docs/` に vision/link/altitude/qualification/recovery の未確定境界を記録した。
+- A1: `atomcam-sd/build.sh` の release ID、衝突拒否、submodule lock/cleanup、ZIP verifier、builder rootfs/kernel evidence を実装。`artifacts/20260908-readonly-v2/` に新 ZIP/build.log/manifest を生成し、既存成果物は上書きしていない。`source_evidence.all_checked_passed=true`。builder digest は取得できておらず manifest では `null`。build failure/signal/concurrency の自動 fault-injection test は未完。
+- A2: `host/camera_deploy.py` に strict known-hosts SSH、MAC/model/hash-tool preflight、manifest/hash 検証、stage/activate/status/rollback、dry-run、unique upload token、identical release idempotency、cleanup/lock を実装。fake runner tests は成功。real camera の v1→v2→rollback は未実施。
+- A3: `docs/ssh-update-design.md` に pinned initramfs の1/2 partition分岐、rootfs/kernel逐次commit、SD-backed SSH/config、offline recovery、kernel単一名のrollback限界を記録。real layout/power-lossはunknownのまま。boot layout inspection、rootfs selector、boot-image deploy CLI、boot health/rollback、SD recovery/power-loss の5子課題を作成。
+- B1: CF1 parser/session/LineCollector を Arduino 非依存に分離し、finite/token/range/mode/sequence、claim reset、250 ms watchdog、overlong discard、RX byte budget、nonblocking TX gate を追加。native test と `camfly-safe` build は成功。実 USB TX-stall/flood injection は未実施。
+- B2: `host/control_loop.py` の immutable expiring intent、latest mailbox、pre-send watchdog、fault latchを導入。201 ms stall、stopped producer、missing response、partial line、200 delayed ACK、overlong RX、disconnect/short-write を fake test で検証。
+- B3: bounded JPEG、same-host redirect、frame clocks/latest-worker、schema-v2 probeを実装。実 Atom Cam JPEG は64.108秒、1920×1080、13 frames、0 failed HTTP attempt、0.203 fps、request p95 5.145秒/max 5.147秒で closed-loop use を reject。低遅延 RTSP/WebRTC 子課題を作成。
+- C1: `host/integration.py` の replay/zero-only safe adapter/bounded JSONL/fault injection/`--duration` を実装。safe-hardware 600.011秒 run は11,169 zero SET、ARM=0、DISARM=0、fault=0、tick p95約55.05 ms/max約79.55 ms。camera gap 10,091 tickでも serial scheduler は継続。
+- C2: `host/vision.py` に `body_frd`/`world_frd` pose contract、sequence/freshness/quality/bounds fail-closed gateを実装。ただし detector/calibration/sign/accuracy test は未実施。
+- C3: legacy ESP-NOW 25-byte parserをlength/target/checksum/finite/modeでhardeningし、gateway候補のwire/session contractを設計。実 gateway は未接続・未測定。
+- C4: altitude/ToF/姿勢のsource contract、LAND!=DISARM、failure tableを文書化し、altitude command API / telemetry validity / landing-failsafe adapter の3子課題を作成。実 adapter/flight behavior は未実装。
+- D1: `host/mission.py` のexplicit START/capability/health/deadline/latched FAULT FSMを実装。TAKEOFF完了は`!grounded`、LAND完了は`grounded && !armed`を必須化。real adapterは未実装。
+- E1: `docs/flight-qualification.md` に evidence budget と G0〜G5 gate を更新し、`host/qualification.py` にhardware-free log evaluatorを実装。criteria未指定では`qualified=null`。dynamics simulator、outer controller、real adapter、flight build/preflight、staged flight test の5子課題を作成。最終flight criteriaは実測依存で未確定。
 
-検証結果：`.venv/bin/python -m unittest discover -s host/tests -v`（24件）、`python3 -m unittest discover -s atomcam-sd/tests -v`（11件）、`bash firmware/stampfly/tests/run_native_tests.sh`、`.venv/bin/pio run -e camfly-safe`、`bash -n atomcam-sd/build.sh`、`git diff --check` が成功した。
+最終 software verification：host unittest 45件 PASS、Atom Cam SD unittest 11件 PASS、StampFly native protocol tests PASS、`camfly-safe` PlatformIO release build SUCCESS。local Markdown link check も PASS。
 
-未達：実カメラの60秒以上の映像計測、識別済みカメラへの SSH deploy、safe hardware 10分ログ、自由飛行 transport、校正済み視覚推定、高度/LAND adapter、flight build、実飛行ログは機材・実測・安全手順が未確定のため実施していない。
+未達：real SSH runtime rollback、boot-image real layout/commit/rollback/power-loss、RTSP/WebRTC low-latency stream、calibration/pose accuracy、ESP-NOW gateway、telemetry validity、metre altitude/LAND adapter、outer controller + G1 dynamics、flight build/preflight、actual flight/G4/G5。これらを成功扱いしない。
 
 ## 変更履歴
 

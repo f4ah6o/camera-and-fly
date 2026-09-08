@@ -1,7 +1,7 @@
 # カメラフレームの鮮度・遅延・欠損を測定できる入力基盤を作る
 
 Status: open
-Model: unknown
+Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
 Branch: codex/20260908-camera-stream-measurement
@@ -37,10 +37,10 @@ control loop を止めない bounded latest-frame 入力と、実測によるス
 
 ## 受け入れ条件
 
-- [ ] HTTP timeout/巨大 response/破損 JPEG はメモリ上限内で失敗し、control loop をブロックしない。
-- [ ] request/receive/capture 時刻を混同せず、未知の撮影時刻が明示される。
-- [ ] ローカル HTTP fixture で遅延・停止・redirect・再接続を再現できる。
-- [ ] 実測レポートに試験時間、照明、解像度、遅延分位点、欠損率と採否判断がある。
+- [x] HTTP timeout/巨大 response/破損 JPEG はメモリ上限内で失敗し、control loop をブロックしない。
+- [x] request/receive/capture 時刻を混同せず、未知の撮影時刻が明示される。
+- [x] ローカル HTTP fixture で遅延・停止・redirect・再接続を再現できる。
+- [x] 実測レポートに試験時間、照明、解像度、遅延分位点、欠損率と採否判断がある。
 
 ## テスト計画
 
@@ -49,6 +49,14 @@ control loop を止めない bounded latest-frame 入力と、実測によるス
 ## リスク
 
 HTTP cache の無効化だけでセンサ時点の鮮度は保証できない。映像周期が遅ければ20 Hz指令を出せても20 Hz観測ではない。
+
+## 実装記録（2026-09-08）
+
+- `camera_probe.py` を schema v2 にし、JPEG SOFからdecoderなしで解像度を記録、達成FPS、HTTP試行失敗率、condition/lighting/decisionを保存するようにした。
+- host test で bounded JPEG、破損/巨大response、same-host redirect、worker再接続、probe reportを検証した。
+- 識別済みの元Atom Cam 1を64.108秒測定。1920×1080、13 frame、0 HTTP failure、達成0.203 fps、request latency p50 5.135 s / p95 5.145 s / p99 5.146 s / max 5.147 s。撮影時刻は未知。
+- JPEG snapshot は閉ループ視覚制御には不採用。ローカル証拠は `artifacts/20260908-camera-jpeg-60s-v2.json`（Git対象外）。結果は `docs/camera-measurement.md` に記録した。
+- 後続：[低遅延RTSP/WebRTC測定](20260908-camera-low-latency-stream.md)。
 
 ## 変更履歴
 

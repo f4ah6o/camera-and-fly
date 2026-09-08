@@ -1,7 +1,7 @@
 # Atom Cam の SD ランタイムを SSH で更新・差し戻しできる CLI を追加する
 
 Status: open
-Model: unknown
+Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
 Branch: codex/20260908-ssh-runtime-deploy
@@ -38,9 +38,9 @@ kernel/rootfs 更新、再起動、SSH 鍵の作成/上書き、自動起動へ�
 
 ## 受け入れ条件
 
-- [ ] 各コマンドに help と dry-run があり、dry-run は転送・書き込み・実行しない。
+- [x] 各コマンドに help と dry-run があり、dry-run は転送・書き込み・実行しない。
 - [ ] 誤 host key/MAC、容量不足、hash 不一致、途中切断、多重操作で active が不変。
-- [ ] 同じ release の再 stage は一致なら冪等、内容が違えば拒否。
+- [x] 同じ release の再 stage は一致なら冪等、内容が違えば拒否。
 - [ ] fixture v1/v2 の切替と前版への rollback を fake SSH と実機で記録できる。
 
 ## テスト計画
@@ -50,6 +50,14 @@ kernel/rootfs 更新、再起動、SSH 鍵の作成/上書き、自動起動へ�
 ## リスク
 
 更新済みファイルと稼働中プロセスは別状態。status は active release と実行確認結果を区別する。hash 照合は SSH で認証された送信元を前提とし、第三者配布の署名検証を代替しない。
+
+## 実装記録（2026-09-08）
+
+`host/camera_deploy.py` に strict known-hosts SSH runner、target MAC/model/hash-tool preflight、manifest/file hash validation、inspect/stage/activate/status/rollback、dry-run、remote lock、same-SD marker update を実装した。stage は毎回 unique upload token を使い、operation-owned temp を cleanup する。同一 release が既に存在する場合は全 manifest/file 内容が一致するときだけ idempotent success とし、内容違いは拒否する。
+
+`host/tests/test_camera_deploy.py` では stage→activate→rollback、idempotency、identity/capacity/hash-tool preflight、traversal/hash mismatch を fake runner で検証している。SSH runner は `StrictHostKeyChecking=yes` と専用 known_hosts を使用し、dry-run は remote transfer/write を行わない。ただし host-key mismatch、転送途中切断、remote lock競合の各 fault point で active 不変を自動注入する test はまだ揃っていないため、その複合 acceptance は未達として残す。
+
+識別済み real Atom Cam での fixture v1→v2→rollback と、real SSH disconnect/rollback は未実施なので最後の acceptance は未達のまま残す。device-specific network identity は記録しない。
 
 ## 変更履歴
 

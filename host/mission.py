@@ -100,8 +100,15 @@ class MissionConfig:
     landing_timeout_seconds: float = 10.0
     target_altitude_m: float = 0.3
     altitude_tolerance_m: float = 0.08
+    required_capabilities: FrozenSet[str] = field(
+        default_factory=lambda: frozenset({"arm", "takeoff", "land"})
+    )
 
     def __post_init__(self) -> None:
+        if not isinstance(self.required_capabilities, frozenset) or not all(
+            isinstance(value, str) and value for value in self.required_capabilities
+        ):
+            raise ValueError("required_capabilities must be a frozenset of non-empty strings")
         for name in (
             "observation_max_age_seconds",
             "telemetry_max_age_seconds",
@@ -177,6 +184,9 @@ def _healthy_for_flight(
         return False, "battery_not_ok"
     if not health.within_bounds:
         return False, "outside_bounds"
+    missing_capabilities = config.required_capabilities - health.capabilities
+    if missing_capabilities:
+        return False, "capability_missing:" + ",".join(sorted(missing_capabilities))
     return True, None
 
 
@@ -219,7 +229,7 @@ def step(
             entered = _enter(context, MissionState.READY, now_monotonic)
             updated, action = _action(entered, ActionKind.NONE)
             return MissionTransition(updated, action)
-        if now_monotonic - context.entered_at > config.preflight_timeout_seconds:
+        if now_monotonic - context.entered_at >= config.preflight_timeout_seconds:
             faulted = _enter(context, MissionState.FAULT, now_monotonic, reason=reason or "preflight_timeout")
             updated, action = _action(faulted, ActionKind.REQUEST_SAFE_RECOVERY, reason=reason or "preflight_timeout")
             return MissionTransition(updated, action)
@@ -247,7 +257,7 @@ def step(
             entered = _enter(context, MissionState.TAKING_OFF, now_monotonic)
             updated, action = _action(entered, ActionKind.TAKEOFF)
             return MissionTransition(updated, action)
-        if now_monotonic - context.entered_at > config.arm_timeout_seconds:
+        if now_monotonic - context.entered_at >= config.arm_timeout_seconds:
             faulted = _enter(context, MissionState.FAULT, now_monotonic, reason="arm_timeout")
             updated, action = _action(faulted, ActionKind.REQUEST_SAFE_RECOVERY, reason="arm_timeout")
             return MissionTransition(updated, action)
@@ -262,11 +272,11 @@ def step(
         reached = health.takeoff_reached
         if health.altitude_m is not None:
             reached = reached or abs(health.altitude_m - config.target_altitude_m) <= config.altitude_tolerance_m
-        if reached:
+        if reached and not health.grounded:
             entered = _enter(context, MissionState.HOLDING, now_monotonic)
             updated, action = _action(entered, ActionKind.HOLD)
             return MissionTransition(updated, action)
-        if now_monotonic - context.entered_at > config.takeoff_timeout_seconds:
+        if now_monotonic - context.entered_at >= config.takeoff_timeout_seconds:
             faulted = _enter(context, MissionState.FAULT, now_monotonic, reason="takeoff_timeout")
             updated, action = _action(faulted, ActionKind.REQUEST_SAFE_RECOVERY, reason="takeoff_timeout")
             return MissionTransition(updated, action)
@@ -282,7 +292,7 @@ def step(
             entered = _enter(context, MissionState.LANDING, now_monotonic)
             updated, action = _action(entered, ActionKind.LAND)
             return MissionTransition(updated, action)
-        if now_monotonic - context.entered_at > config.hold_timeout_seconds:
+        if now_monotonic - context.entered_at >= config.hold_timeout_seconds:
             faulted = _enter(context, MissionState.FAULT, now_monotonic, reason="hold_timeout")
             updated, action = _action(faulted, ActionKind.REQUEST_SAFE_RECOVERY, reason="hold_timeout")
             return MissionTransition(updated, action)
@@ -301,11 +311,11 @@ def step(
             faulted = _enter(context, MissionState.FAULT, now_monotonic, reason=reason)
             updated, action = _action(faulted, ActionKind.REQUEST_SAFE_RECOVERY, reason=reason)
             return MissionTransition(updated, action)
-        if health.grounded:
+        if health.grounded and not health.armed:
             entered = _enter(context, MissionState.COMPLETE, now_monotonic)
             updated, action = _action(entered, ActionKind.COMPLETE)
             return MissionTransition(updated, action)
-        if now_monotonic - context.entered_at > config.landing_timeout_seconds:
+        if now_monotonic - context.entered_at >= config.landing_timeout_seconds:
             faulted = _enter(context, MissionState.FAULT, now_monotonic, reason="landing_timeout")
             updated, action = _action(faulted, ActionKind.REQUEST_SAFE_RECOVERY, reason="landing_timeout")
             return MissionTransition(updated, action)

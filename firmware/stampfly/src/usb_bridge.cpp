@@ -12,7 +12,6 @@
 #include "sensor.hpp"
 
 namespace {
-constexpr size_t kLineCapacity = 192;
 // A 20 Hz SET is shorter than this budget.  Limiting work per 400 Hz poll
 // leaves the stabilization loop a bounded path even when the host floods USB.
 constexpr size_t kMaxBytesPerPoll = 96;
@@ -22,9 +21,7 @@ constexpr size_t kMaxBytesPerPoll = 96;
 constexpr size_t kTxCapacity = 256;
 
 cf1::Session g_session;
-bool g_discarding_line = false;
-char g_line[kLineCapacity];
-size_t g_line_len = 0;
+cf1::LineCollector g_line;
 uint32_t g_tx_dropped = 0;
 
 bool tx_bytes(const char* bytes, size_t length) {
@@ -102,8 +99,8 @@ void parse_error(const cf1::ParseResult& parsed) {
     tx_format("CF1 ERR PARSE %s\r\n", cf1::error_name(parsed.error));
 }
 
-void handle_line(const char* line) {
-    const cf1::ParseResult parsed = cf1::parse_line(line, strlen(line));
+void handle_line(const char* line, size_t length) {
+    const cf1::ParseResult parsed = cf1::parse_line(line, length);
     if (!parsed.ok()) {
         parse_error(parsed);
         return;
@@ -135,8 +132,8 @@ void handle_line(const char* line) {
             const cf1::Setpoint& setpoint = parsed.request.setpoint;
             const cf1::Error error = g_session.accept_set(setpoint, now);
             if (error != cf1::Error::NONE) {
-                USBSerial.printf("CF1 ERR %lu %s\r\n", static_cast<unsigned long>(setpoint.sequence),
-                                 cf1::error_name(error));
+                tx_format("CF1 ERR %lu %s\r\n", static_cast<unsigned long>(setpoint.sequence),
+                          cf1::error_name(error));
                 return;
             }
             Stick[AILERON] = setpoint.roll;
@@ -179,8 +176,7 @@ void enforce_watchdog() {
 
 void usb_bridge_init() {
     g_session.reset();
-    g_line_len = 0;
-    g_discarding_line = false;
+    g_line.reset();
     g_tx_dropped = 0;
     zero_controls();
     tx_literal("CF1 READY\r\n");
@@ -201,26 +197,12 @@ void usb_bridge_poll() {
         const int raw = USBSerial.read();
         if (raw < 0) break;
         ++processed;
-        const char c = static_cast<char>(raw);
-        if (c == '\r') continue;
-        if (c == '\n') {
-            if (g_discarding_line) {
-                tx_literal("CF1 ERR LINE_TOO_LONG\r\n");
-            } else if (g_line_len > 0) {
-                g_line[g_line_len] = '\0';
-                handle_line(g_line);
-            }
-            g_line_len = 0;
-            g_discarding_line = false;
-            continue;
+        const cf1::LineFeedResult result = g_line.feed(static_cast<char>(raw));
+        if (result == cf1::LineFeedResult::LINE_TOO_LONG) {
+            tx_literal("CF1 ERR LINE_TOO_LONG\r\n");
+        } else if (result == cf1::LineFeedResult::LINE_READY) {
+            handle_line(g_line.line(), g_line.length());
         }
-        if (g_discarding_line) continue;
-        if (g_line_len + 1 >= kLineCapacity) {
-            g_line_len = 0;
-            g_discarding_line = true;
-            continue;
-        }
-        g_line[g_line_len++] = c;
     }
 
     enforce_watchdog();

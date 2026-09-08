@@ -1,7 +1,7 @@
 # 読み取り専用 SD イメージの再ビルドとリリース検証を再現可能にする
 
 Status: open
-Model: unknown
+Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
 Branch: codex/20260908-sd-release-verification
@@ -37,10 +37,10 @@ SD 書き込み、SSH 配布、内部フラッシュ書き込み、カメラの�
 
 ## 受け入れ条件
 
-- [ ] 既存 ZIP/ログが不変で、新しい manifest と ZIP が対応する。
+- [x] 既存 ZIP/ログが不変で、新しい manifest と ZIP が対応する。
 - [ ] 出力衝突、ビルド失敗、シグナル中断、同時実行で既存成果物・submodule を壊さない。
-- [ ] 破損・重複・path traversal ZIP は失敗し、不足した検証を成功表示しない。
-- [ ] 新しい読み取り専用ガードを含む再ビルド結果の検証証拠がある。
+- [x] 破損・重複・path traversal ZIP は失敗し、不足した検証を成功表示しない。
+- [x] 新しい読み取り専用ガードを含む再ビルド結果の検証証拠がある。
 
 ## テスト計画
 
@@ -49,6 +49,14 @@ SD 書き込み、SSH 配布、内部フラッシュ書き込み、カメラの�
 ## リスク
 
 ソースとビルドキャッシュの不一致、数十分規模のビルド、VM 容量不足。展開検査は生成物を対象にし、ホストで不明なバイナリを実行しない。
+
+## 実装記録（2026-09-08）
+
+release ID ごとの出力、build lock/cleanup、`atomcam-sd/verify_release.py`、archive member/path/symlink/CRC/header 検査、builder tree の read-only source evidence を実装した。新しい `artifacts/20260908-readonly-v2/` に ZIP/build.log/manifest を保存し、既存 ZIP/log を上書きしていない。manifest の `source_evidence.all_checked_passed=true` で、rootfs tree、kernel source/config、MTD guard 関連 evidence を分離して記録している。
+
+SD tests は verifier を含む11件。manifest の `builder_digest` は現在 `null` で、builder identity を暗黙に捏造していない。
+
+build script には出力衝突拒否、lock、signal cleanup があるが、build failure / signal interruption / concurrent process を fake `limactl` で網羅する自動テストはまだ追加されていないため、その acceptance は未達として残す。
 
 ## 変更履歴
 
