@@ -64,8 +64,8 @@ void imu_init(void) {
     USBSerial.printf("#Sensor enable Status:%d\n\r", bmi2_sensor_enable(sensor_list, 2, pBmi270));
 }
 
-void imu_update(void) {
-    bmi2_get_sensor_data(&imu_data, pBmi270);
+bool imu_update(void) {
+    return bmi2_get_sensor_data(&imu_data, pBmi270) == BMI2_OK;
 }
 
 float imu_get_acc_x(void) {

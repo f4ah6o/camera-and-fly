@@ -35,7 +35,7 @@
 
 void imu_init(void);
 void imu_test(void);
-void imu_update(void);
+bool imu_update(void);
 float imu_get_acc_x(void);
 float imu_get_acc_y(void);
 float imu_get_acc_z(void);

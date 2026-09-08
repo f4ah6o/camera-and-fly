@@ -27,6 +27,7 @@
 #define SENSOR_HPP
 
 #include <Arduino.h>
+#include "telemetry_validity.hpp"
 #include "flight_control.hpp"
 #include "pid.hpp"
 #include <INA3221.h>
@@ -93,6 +94,10 @@ extern volatile float Az_bias;
 extern Alt_kalman EstimatedAltitude;
 extern volatile int16_t RawRangeFront;
 extern volatile int16_t RangeFront;
+
+extern telemetry_contract::Validity SensorTelemetryValidity;
+void telemetry_validity_reset(void);
+const telemetry_contract::Validity& telemetry_validity(void);
 
 void sensor_init(void);
 float sensor_read(void);

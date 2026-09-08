@@ -11,8 +11,8 @@ observer, altitude/LAND adapter, or physical flight log exists yet.
 | Atom Cam JPEG snapshot | 64.108 s, 13 frames, 0.203 fps; request latency p95 5.145 s, max 5.147 s | rejected for closed-loop localization; RTSP/WebRTC remains unmeasured |
 | visual pose contract | `body_frd`/`world_frd`, sequence/freshness/quality/bounds fail-closed gate implemented | no calibrated detector, pose-error distribution, or sign-test evidence yet |
 | USB CF1 safe hardware | 600.011 s, 11,169 zero SET, ARM=0, faults=0; tick p95 55.05 ms, max 79.55 ms | usable bench integration evidence only; USB tether is not free-flight transport |
-| free-flight link | ESP-NOW gateway design issue exists | no gateway measurement or implementation evidence |
-| altitude / landing | source contract and semantic API design recorded | telemetry validity, metre-valued altitude command, LAND adapter, and flight behavior are not implemented |
+| free-flight link | version-1 pure packet/session core exists; no RF integration | no gateway measurement or implementation evidence |
+| altitude / landing | CF1 telemetry validity/age/source contract implemented | metre-valued altitude command, LAND adapter, and flight behavior are not implemented |
 | mission FSM | explicit START, capability gates, feedback-required takeoff/landing completion, latched fault | semantic/replay evidence only; real action adapter is absent |
 
 The safe-hardware run is recorded locally in
@@ -28,7 +28,7 @@ is suitable for flight.
 | Stage | Input | Pass condition | Current status |
 | --- | --- | --- | --- |
 | G0 | pure FSM/replay | deterministic transitions; no implicit START/ARM; faults latch | implemented and tested |
-| G1 | delayed/lossy dynamics fixture | explicit plant model, delay/loss injection, bounded commands, deterministic pass/fail | not implemented |
+| G1 | delayed/lossy dynamics fixture | explicit plant model, delay/loss injection, bounded commands, deterministic pass/fail | implemented as hardware-free evidence only; not flight evidence |
 | G2 | `camfly-safe` hardware | at least 10 minutes, ARM=0, every SET zero, no control fault, bounded scheduler log | passed for zero-output integration only; 600.011 s log recorded |
 | G3 | propellers removed | explicit flight build, real adapter, preflight capability/identity checks, operator stop path | not implemented |
 | G4 | managed low-height test | explicit START, bounded test area, qualified observation/link/altitude, abort + landing path | not authorized / prerequisites incomplete |
@@ -68,6 +68,11 @@ opens no camera, serial, or radio device. A `sample` record contains:
 Each run has exactly one `outcome`: `completed`, `aborted`, or `failed`.
 Missing outcomes remain visible. Invalid observation/telemetry samples are
 counted and are not silently removed to obtain a passing decision.
+
+`host/flight_sim.py` produces the same schema-v1 JSONL shape with
+`evidence_kind=simulation` and `simulation=true`. Its fixed plant constants
+are test-fixture values, not identified aircraft parameters. Delay, drop,
+reorder, command expiry, and producer-stop cases remain visible as faults.
 
 The evaluator reports horizontal and altitude p95/max error, maximum ages and
 command period, saturation fraction, fault samples, total/completed/aborted/

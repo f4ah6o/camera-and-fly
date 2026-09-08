@@ -36,7 +36,7 @@ class FakeSerial:
         self.writes.append(payload.decode())
         command = payload.decode().strip()
         if command == "CF1 HELLO":
-            self.rx.append(b"CF1 HELLO stampfly-camfly/2\r\n")
+            self.rx.append(b"CF1 HELLO stampfly-camfly/3 telemetry_validity_v1\r\n")
         elif command == "CF1 CLAIM":
             self.rx.append(b"CF1 OK CLAIM\r\n")
         elif command.startswith("CF1 SET "):
@@ -44,7 +44,10 @@ class FakeSerial:
         elif command == "CF1 STATUS":
             self.rx.append(
                 b"CF1 STATUS claimed=1 armed=0 connected=1 mode=3 voltage=4.1 "
-                b"roll=0 pitch=0 yaw=0 altitude=0 range=0 safe_test=1\r\n"
+                b"roll=0 pitch=0 yaw=0 altitude=0 range=0 altitude_m=0 altitude_valid=0 "
+                b"altitude_age_ms=4294967295 altitude_source=tof_imu range_mm=0 range_valid=0 "
+                b"range_age_ms=4294967295 range_source=tof_bottom imu_valid=0 imu_age_ms=4294967295 "
+                b"imu_source=bmi270 capabilities=telemetry_validity_v1 safe_test=1\r\n"
             )
         elif command in {"CF1 DISARM", "CF1 RELEASE"}:
             self.rx.append(f"CF1 OK {command.split()[1]}\r\n".encode())
@@ -72,18 +75,50 @@ class StampFlyTests(unittest.TestCase):
     def test_fake_serial_handshake_and_status(self):
         fake = FakeSerial()
         client = StampFly("fake", serial_instance=fake, sleep=lambda _: None)
-        self.assertEqual(client.connect(), "CF1 HELLO stampfly-camfly/2")
+        self.assertEqual(client.connect(), "CF1 HELLO stampfly-camfly/3 telemetry_validity_v1")
         client.set_control(0, 0, 0, 0, wait_ack=True)
         status = client.status()
         self.assertTrue(status.safe_test)
         self.assertNotIn("CF1 ARM", "".join(fake.writes))
 
     def test_invalid_status_boolean_and_mode_are_rejected(self):
-        base = "CF1 STATUS claimed=1 armed=0 connected=maybe mode=3 voltage=4.1 roll=0 pitch=0 yaw=0 altitude=0 range=0 safe_test=1"
+        base = (
+            "CF1 STATUS claimed=1 armed=0 connected=maybe mode=3 voltage=4.1 roll=0 pitch=0 yaw=0 "
+            "altitude=0 range=0 altitude_m=0 altitude_valid=0 altitude_age_ms=4294967295 "
+            "altitude_source=tof_imu range_mm=0 range_valid=0 range_age_ms=4294967295 "
+            "range_source=tof_bottom imu_valid=0 imu_age_ms=4294967295 imu_source=bmi270 "
+            "capabilities=telemetry_validity_v1 safe_test=1"
+        )
         with self.assertRaises(ProtocolError):
             StampFlyStatus.parse(base)
         with self.assertRaises(ProtocolError):
             StampFlyStatus.parse(base.replace("connected=maybe", "connected=1").replace("mode=3", "mode=99"))
+
+    def test_telemetry_validity_requires_units_age_and_source(self):
+        line = (
+            "CF1 STATUS claimed=1 armed=0 connected=1 mode=3 voltage=4.1 roll=0 pitch=0 yaw=0 "
+            "altitude=0.3 range=300 altitude_m=0.3 altitude_valid=1 altitude_age_ms=5 "
+            "altitude_source=tof_imu range_mm=300 range_valid=1 range_age_ms=4 "
+            "range_source=tof_bottom imu_valid=1 imu_age_ms=3 imu_source=bmi270 "
+            "capabilities=telemetry_validity_v1 safe_test=1"
+        )
+        status = StampFlyStatus.parse(line)
+        self.assertTrue(status.telemetry_valid)
+        self.assertEqual(status.altitude_age_ms, 5)
+        self.assertEqual(status.range_mm, 300)
+
+        for replacement in (
+            ("altitude_m=0.3 ", ""),
+            ("range_valid=1", "range_valid=maybe"),
+            ("imu_age_ms=3", "imu_age_ms=nan"),
+            ("capabilities=telemetry_validity_v1", "capabilities=legacy"),
+        ):
+            with self.subTest(replacement=replacement):
+                with self.assertRaises(ProtocolError):
+                    StampFlyStatus.parse(line.replace(*replacement))
+
+        unknown = line.replace("altitude_valid=1", "altitude_valid=0").replace("altitude_age_ms=5", "altitude_age_ms=4294967295")
+        self.assertFalse(StampFlyStatus.parse(unknown).telemetry_valid)
 
     def test_expired_host_watchdog_and_sequence_limit(self):
         fake = FakeSerial()
@@ -116,12 +151,12 @@ class StampFlyTests(unittest.TestCase):
                 if command == "CF1 HELLO":
                     for sequence in range(200):
                         self.rx.append(f"CF1 OK {sequence}\r\n".encode())
-                    self.rx.append(b"CF1 HELLO stampfly-camfly/2\r\n")
+                    self.rx.append(b"CF1 HELLO stampfly-camfly/3 telemetry_validity_v1\r\n")
                 return len(payload)
 
         fake = NoisySerial()
         client = StampFly("fake", serial_instance=fake, sleep=lambda _: None, max_rx_line_bytes=128)
-        self.assertEqual(client.hello(), "CF1 HELLO stampfly-camfly/2")
+        self.assertEqual(client.hello(), "CF1 HELLO stampfly-camfly/3 telemetry_validity_v1")
         self.assertLessEqual(len(client._rx_buffer), 128)
 
     def test_overlong_received_line_is_rejected_and_buffer_cleared(self):

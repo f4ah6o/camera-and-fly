@@ -15,6 +15,20 @@ c++ -std=c++17 -Wall -Wextra -Werror \
 
 c++ -std=c++17 -Wall -Wextra -Werror \
   -I"$ROOT/src" \
+  "$ROOT/src/flight_link_protocol.cpp" \
+  "$ROOT/tests/test_flight_link_protocol.cpp" \
+  -o "$BUILD/test_flight_link_protocol"
+"$BUILD/test_flight_link_protocol"
+
+c++ -std=c++17 -Wall -Wextra -Werror \
+  -I"$ROOT/src" \
+  "$ROOT/src/telemetry_validity.cpp" \
+  "$ROOT/tests/test_telemetry_validity.cpp" \
+  -o "$BUILD/test_telemetry_validity"
+"$BUILD/test_telemetry_validity"
+
+c++ -std=c++17 -Wall -Wextra -Werror \
+  -I"$ROOT/src" \
   "$ROOT/src/legacy_rc_protocol.cpp" \
   "$ROOT/tests/test_legacy_rc_protocol.cpp" \
   -o "$BUILD/test_legacy_rc_protocol"

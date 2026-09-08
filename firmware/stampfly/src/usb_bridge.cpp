@@ -18,7 +18,7 @@ constexpr size_t kMaxBytesPerPoll = 96;
 // Replies are optional acknowledgements.  Never wait for a host to drain USB;
 // a dropped reply becomes a host-side timeout/fault and the firmware watchdog
 // remains the final control safety boundary.
-constexpr size_t kTxCapacity = 256;
+constexpr size_t kTxCapacity = 512;
 
 cf1::Session g_session;
 cf1::LineCollector g_line;
@@ -75,8 +75,12 @@ void disarm_now(const char* reason, bool report) {
 
 void status_reply() {
     const uint32_t now = millis();
+    const telemetry_contract::Validity& validity = telemetry_validity();
     tx_format(
-        "CF1 STATUS claimed=%u armed=%u connected=%u mode=%u voltage=%.3f roll=%.3f pitch=%.3f yaw=%.3f altitude=%.3f range=%d safe_test=%u\r\n",
+        "CF1 STATUS claimed=%u armed=%u connected=%u mode=%u voltage=%.3f roll=%.3f pitch=%.3f yaw=%.3f "
+        "altitude=%.3f range=%d altitude_m=%.3f altitude_valid=%u altitude_age_ms=%lu "
+        "altitude_source=tof_imu range_mm=%d range_valid=%u range_age_ms=%lu range_source=tof_bottom "
+        "imu_valid=%u imu_age_ms=%lu imu_source=bmi270 capabilities=telemetry_validity_v1 safe_test=%u\r\n",
         g_session.claimed() ? 1U : 0U,
         g_session.armed() ? 1U : 0U,
         g_session.connected(now) ? 1U : 0U,
@@ -87,6 +91,14 @@ void status_reply() {
         static_cast<double>((Yaw_angle - Yaw_angle_offset) * 180.0f / PI),
         static_cast<double>(Altitude),
         static_cast<int>(Range),
+        static_cast<double>(Altitude),
+        validity.altitude_valid(now) ? 1U : 0U,
+        static_cast<unsigned long>(validity.altitude_age_ms(now)),
+        static_cast<int>(Range),
+        validity.range_valid(now) ? 1U : 0U,
+        static_cast<unsigned long>(validity.range_age_ms(now)),
+        validity.imu_valid(now) ? 1U : 0U,
+        static_cast<unsigned long>(validity.imu_age_ms(now)),
 #ifdef CAMFLY_SAFE_TEST
         1U
 #else
@@ -109,10 +121,11 @@ void handle_line(const char* line, size_t length) {
     const uint32_t now = millis();
     switch (parsed.request.command) {
         case cf1::Command::HELLO:
-            tx_literal("CF1 HELLO stampfly-camfly/2\r\n");
+            tx_literal("CF1 HELLO stampfly-camfly/3 telemetry_validity_v1\r\n");
             return;
         case cf1::Command::CLAIM:
             g_session.claim();
+            telemetry_validity_reset();
             disarm_now("claim", false);
             tx_literal("CF1 OK CLAIM\r\n");
             return;

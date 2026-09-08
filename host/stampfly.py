@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 import math
+import re
 import threading
 import time
 from typing import Any, Callable, Optional
@@ -32,7 +33,8 @@ ALT_MODE_MANUAL = 5
 FIRMWARE_WATCHDOG_SECONDS = 0.250
 DEFAULT_LOCAL_WATCHDOG_SECONDS = 0.200
 MAX_SEQUENCE = 0xFFFFFFFF
-MAX_RX_LINE_BYTES = 256
+MAX_RX_LINE_BYTES = 512
+UNKNOWN_TELEMETRY_AGE_MS = 0xFFFFFFFF
 
 _MODE_NAMES = {
     0: "INIT",
@@ -68,12 +70,35 @@ class StampFlyStatus:
     yaw: float
     altitude: float
     range_mm: int
+    altitude_m: float
+    altitude_valid: bool
+    altitude_age_ms: int
+    altitude_source: str
+    range_valid: bool
+    range_age_ms: int
+    range_source: str
+    imu_valid: bool
+    imu_age_ms: int
+    imu_source: str
+    capabilities: frozenset[str]
     safe_test: bool
     fields: dict[str, str]
 
     @property
     def mode_name(self) -> str:
         return _MODE_NAMES.get(self.mode, f"UNKNOWN({self.mode})")
+
+    @property
+    def telemetry_valid(self) -> bool:
+        """Whether all required sensor observations are currently usable."""
+        return (
+            self.altitude_valid
+            and self.range_valid
+            and self.imu_valid
+            and self.altitude_age_ms != UNKNOWN_TELEMETRY_AGE_MS
+            and self.range_age_ms != UNKNOWN_TELEMETRY_AGE_MS
+            and self.imu_age_ms != UNKNOWN_TELEMETRY_AGE_MS
+        )
 
     @classmethod
     def parse(cls, line: str) -> "StampFlyStatus":
@@ -84,19 +109,35 @@ class StampFlyStatus:
         fields: dict[str, str] = {}
         for token in line[len(prefix):].split():
             if "=" not in token:
-                continue
+                raise ProtocolError(f"STATUS has a malformed token: {token!r}")
             key, value = token.split("=", 1)
+            if not key or not value or key in fields:
+                raise ProtocolError(f"STATUS has a malformed or duplicate field: {token!r}")
             fields[key] = value
 
-        for name in ("claimed", "armed", "connected", "safe_test"):
+        for name in (
+            "claimed",
+            "armed",
+            "connected",
+            "altitude_valid",
+            "range_valid",
+            "imu_valid",
+            "safe_test",
+        ):
             if name not in fields or fields[name] not in {"0", "1"}:
                 raise ProtocolError(f"STATUS has invalid boolean {name}: {line!r}")
 
-        def integer(name: str) -> int:
+        def integer(name: str, *, minimum: int | None = None, maximum: int | None = None) -> int:
+            raw = fields.get(name)
+            if raw is None or not re.fullmatch(r"(?:0|[1-9][0-9]*)", raw):
+                raise ProtocolError(f"STATUS missing or invalid integer {name}: {line!r}")
             try:
-                return int(fields[name])
-            except (KeyError, ValueError) as exc:
+                value = int(raw)
+            except ValueError as exc:
                 raise ProtocolError(f"STATUS missing integer {name}: {line!r}") from exc
+            if minimum is not None and value < minimum or maximum is not None and value > maximum:
+                raise ProtocolError(f"STATUS integer {name} is out of range: {line!r}")
+            return value
 
         def number(name: str) -> float:
             try:
@@ -107,9 +148,22 @@ class StampFlyStatus:
                 raise ProtocolError(f"STATUS has non-finite {name}: {line!r}")
             return value
 
-        mode = integer("mode")
+        mode = integer("mode", minimum=0, maximum=5)
         if mode not in _MODE_NAMES:
             raise ProtocolError(f"STATUS has unknown mode {mode}: {line!r}")
+
+        def age(name: str) -> int:
+            return integer(name, minimum=0, maximum=UNKNOWN_TELEMETRY_AGE_MS)
+
+        def source(name: str) -> str:
+            value = fields.get(name, "")
+            if not re.fullmatch(r"[A-Za-z0-9_.-]+", value):
+                raise ProtocolError(f"STATUS has invalid source {name}: {line!r}")
+            return value
+
+        capabilities = frozenset(fields.get("capabilities", "").split(","))
+        if "telemetry_validity_v1" not in capabilities:
+            raise ProtocolError(f"STATUS lacks telemetry_validity_v1: {line!r}")
 
         return cls(
             claimed=fields.get("claimed") == "1",
@@ -121,7 +175,18 @@ class StampFlyStatus:
             pitch=number("pitch"),
             yaw=number("yaw"),
             altitude=number("altitude"),
-            range_mm=integer("range"),
+            range_mm=integer("range_mm", minimum=0),
+            altitude_m=number("altitude_m"),
+            altitude_valid=fields["altitude_valid"] == "1",
+            altitude_age_ms=age("altitude_age_ms"),
+            altitude_source=source("altitude_source"),
+            range_valid=fields["range_valid"] == "1",
+            range_age_ms=age("range_age_ms"),
+            range_source=source("range_source"),
+            imu_valid=fields["imu_valid"] == "1",
+            imu_age_ms=age("imu_age_ms"),
+            imu_source=source("imu_source"),
+            capabilities=capabilities,
             safe_test=fields.get("safe_test") == "1",
             fields=fields,
         )

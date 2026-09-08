@@ -30,6 +30,7 @@
 
 Madgwick Drone_ahrs;
 Alt_kalman EstimatedAltitude;
+telemetry_contract::Validity SensorTelemetryValidity;
 
 INA3221 ina3221(INA3221_ADDR40_GND);  // Set I2C address to 0x40 (A0 pin -> GND)
 Filter acc_filter;
@@ -127,6 +128,7 @@ void ahrs_reset(void) {
 }
 
 void sensor_init() {
+    SensorTelemetryValidity.reset();
     // beep_init();
 
     Wire1.begin(SDA_PIN, SCL_PIN, 400000UL);
@@ -189,6 +191,8 @@ float sensor_read(void) {
     float sens_interval;
     float h;
     static float opt_interval = 0.0;
+    bool altitude_sample_attempted = false;
+    bool altitude_sample_valid = false;
 
     st              = micros();
     old_sensor_time = sensor_time;
@@ -207,13 +211,17 @@ float sensor_read(void) {
     // Z軸：上下（上が正）左回りが回転の正
 
     // Get IMU raw data
-    imu_update();  // IMUの値を読む前に必ず実行
+    const bool imu_read_ok = imu_update();  // IMUの値を読む前に必ず実行
     acc_x  = imu_get_acc_x();
     acc_y  = imu_get_acc_y();
     acc_z  = imu_get_acc_z();
     gyro_x = imu_get_gyro_x();
     gyro_y = imu_get_gyro_y();
     gyro_z = imu_get_gyro_z();
+    SensorTelemetryValidity.mark_imu(
+        imu_read_ok && isfinite(acc_x) && isfinite(acc_y) && isfinite(acc_z) && isfinite(gyro_x) &&
+            isfinite(gyro_y) && isfinite(gyro_z),
+        millis());
 
     // USBSerial.printf("%9.6f %9.6f %9.6f\n\r", Elapsed_time, sens_interval, acc_z);
 
@@ -282,9 +290,12 @@ float sensor_read(void) {
                 // 距離の値の更新
                 // old_range[0] = dist;
                 RawRange = tof_bottom_get_range();
+                altitude_sample_attempted = true;
+                altitude_sample_valid = RawRange > 20 && RawRange < 8190;
+                SensorTelemetryValidity.mark_range(altitude_sample_valid, millis());
                 if (Mode == PARKING_MODE) RawRangeFront = tof_front_get_range();
                 // USBSerial.printf("%9.6f %d\n\r", Elapsed_time, RawRange);
-                if (RawRange > 20) {
+                if (altitude_sample_valid) {
                     Range = RawRange;
                 }
                 if (RawRangeFront > 0.01) {
@@ -322,6 +333,10 @@ float sensor_read(void) {
         else
             first_flag = 1;
         Altitude2 = EstimatedAltitude.Altitude;
+        if (altitude_sample_attempted) {
+            SensorTelemetryValidity.mark_altitude(
+                altitude_sample_valid && isfinite(Altitude) && isfinite(Altitude2), millis());
+        }
         // MAX_ALTを超えたら高度下げる（自動着陸）
         if ((Altitude2 > ALT_LIMIT && Alt_flag >= 1 && Flip_flag == 0) || RawRange == 0)
             Range0flag++;
@@ -359,4 +374,12 @@ float sensor_read(void) {
     uint32_t et = micros();
     // USBSerial.printf("Sensor read %f %f %f\n\r", (mt-st)*1.0e-6, (et-mt)*1e-6, (et-st)*1.0e-6);
     return (et - st) * 1.0e-6;
+}
+
+void telemetry_validity_reset(void) {
+    SensorTelemetryValidity.reset();
+}
+
+const telemetry_contract::Validity& telemetry_validity(void) {
+    return SensorTelemetryValidity;
 }

@@ -32,8 +32,22 @@ newline and each 400 Hz poll consumes at most a fixed number of USB bytes.
 CF1 replies use a bounded `availableForWrite()` gate and never flush/block the
 control loop; a dropped acknowledgement is handled as a host timeout/fault.
 
+`CF1 STATUS` also carries the versioned `telemetry_validity_v1` capability and
+machine-readable altitude, ToF range, and IMU validity/age/source fields.
+Sensor age uses the firmware monotonic clock; an invalid update never makes a
+retained numeric value fresh, and unknown age is represented explicitly.
+
 Run the Arduino-independent parser/session tests before the firmware build:
 
 ```sh
 bash firmware/stampfly/tests/run_native_tests.sh
 ```
+
+The future ESP-NOW link has a separate pure protocol core in
+`src/flight_link_protocol.{hpp,cpp}`. Its version-1 frame is little-endian:
+`CF` magic, version, message kind, uint64 session ID, uint32 sequence, uint16
+receiver TTL, uint16 capability bits, uint16 payload length, payload, and
+CRC-16/CCITT. `SET` uses normalized int16/int16/int16/uint16 values plus
+explicit modes. Application ACK and RF-delivery indication carry different
+ACK classes; a delivery indication never refreshes the command watchdog.
+This core is not connected to ESP-NOW or the legacy 25-byte RC receiver.

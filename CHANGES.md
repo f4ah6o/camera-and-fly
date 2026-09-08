@@ -9,5 +9,12 @@
 - Added strict CF1 parser/session validation in the StampFly safe firmware and
   native protocol tests; duplicate or stale sequences no longer refresh the
   watchdog.
+- Added explicit altitude, ToF range, and IMU validity/age/source telemetry to
+  CF1 STATUS with fail-closed host parsing.
+- Added a pure version-1 flight-link packet/session core in C++ and Python,
+  including CRC, TTL, sequence, ACK-class, and re-session semantics.
+- Added a bounded decoded-frame adapter and FFmpeg/synthetic probe, plus a
+  deterministic delayed/lossy flight-dynamics fixture for G1 evidence.
 - Added manifest verification for read-only SD artifacts and an explicit,
-  reversible versioned runtime deployment CLI for the SD filesystem.
+  reversible versioned runtime deployment CLI for the SD filesystem, with
+  failure-injection coverage for SD builds and remote deployment.

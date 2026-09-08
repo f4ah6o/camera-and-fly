@@ -111,6 +111,7 @@ The protocol implementation is in host/stampfly.py. It provides:
 - local 200 ms watchdog in addition to the 250 ms firmware watchdog
 - best-effort DISARM on close and exceptions
 - STATUS parsing
+- canonical altitude, range, and IMU validity/age/source parsing
 - no automatic ARM
 
 The host-side bounded scheduler is in `host/control_loop.py`. It publishes
@@ -181,6 +182,14 @@ See `docs/flight-qualification.md` for the G0-G5 gate and the remaining
 low-latency camera, calibration, free-flight link, altitude/LAND, and flight
 build prerequisites.
 
+The G1 plant fixture is deterministic and hardware-free. It uses the
+`world_frd` frame, explicit command expiry, and injectable delay/drop/jitter
+without opening a camera, serial port, or radio:
+
+~~~sh
+.venv/bin/python host/flight_sim.py --output /tmp/camfly-simulation.jsonl
+~~~
+
 ## SD runtime deployment
 
 `host/camera_deploy.py` supports explicit `inspect`, `stage`, `activate`,
@@ -217,6 +226,25 @@ python host/atomcam.py --url http://atomcam.local --once
 python host/atomcam.py --url http://atomcam.local --save /tmp/atomcam.jpg
 python host/atomcam.py --url http://atomcam.local --rtsp video1
 ~~~
+
+Decoded RTSP/WebRTC frames use the bounded adapter in
+`host/camera_stream.py`. The selected backend is the FFmpeg CLI because it is
+available on macOS arm64 without adding a Python decoder dependency and keeps
+decoder I/O behind a worker. The local development machine reports FFmpeg
+9.0.1; install it with `brew install ffmpeg`. The rawvideo pipe has no source
+PTS/DTS side channel, so the adapter leaves those fields unknown and records
+receive and decode-complete monotonic clocks separately.
+
+Run the deterministic fixture or a duration-bounded live probe:
+
+~~~sh
+.venv/bin/python host/camera_stream_probe.py --backend synthetic
+.venv/bin/python host/camera_stream_probe.py --backend ffmpeg \
+  --url rtsp://<camera>:8554/video1_unicast --duration 10
+~~~
+
+Probe results are measurement evidence only; a live camera result does not
+authorize flight.
 
 The endpoint is not usable until the Atom Cam 1 microSD image has been booted.
 No microSD card is selected or modified by this repository.

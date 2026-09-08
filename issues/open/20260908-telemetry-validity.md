@@ -20,9 +20,17 @@ Branch: main
 
 現STATUSは `Altitude` と `Range` を返すが、ToF invalid時に保持された値か、新しい測定かをhost側で区別できない。`Altitude2`、`Alt_flag`、`Range0flag` も現在のCF1 STATUS契約にはない。
 
+## 問題
+
+数値だけを受け取るhostは、保持値、stale値、未取得値、センサ更新失敗を同じ「有効な値」として扱う余地がある。再接続後に前回セッションの鮮度を持ち越すこともできない。
+
 ## 目標
 
 センサ更新時刻・validity・sourceを明示し、mission/landing adapterがunknown/stale値を有効扱いしないようにする。
+
+## 対象外
+
+高度制御、failsafe閾値、landing adapter、センサドライバの交換、実飛行許可は扱わない。実機遷移ログは別途取得する。
 
 ## 提案仕様
 
@@ -32,12 +40,16 @@ Branch: main
 - invalid時も最後の数値をdebug用に返せるが、`*_valid=0`を優先する。
 - age overflow/unknownは明示値またはvalid=falseで表現し、0msに丸めない。
 
+## 提案する方針
+
+`telemetry_contract::Validity` をfirmwareのセンサ更新とCF1 STATUSの間に置き、更新成功時だけfreshnessを進める。hostは `telemetry_validity_v1` capabilityと厳格なbool/age/source/unit検証を必須にし、無効値をfail closedする。
+
 ## 受け入れ条件
 
-- [ ] ToF失敗後に保持された `Range` が `range_valid=1` として出ない。
-- [ ] altitude/IMUのunknown・stale・invalidがmachine-readableに区別できる。
-- [ ] host parserはbool/age/unitの欠落・NaN・範囲外をfail closedする。
-- [ ] reconnect直後の未取得telemetryをfreshとして扱わない。
+- [x] ToF失敗後に保持された `Range` が `range_valid=1` として出ない。
+- [x] altitude/IMUのunknown・stale・invalidがmachine-readableに区別できる。
+- [x] host parserはbool/age/unitの欠落・NaN・範囲外をfail closedする。
+- [x] reconnect直後の未取得telemetryをfreshとして扱わない。
 - [ ] fake clock/native testと`camfly-safe`実機ログでvalidity遷移を確認する。
 
 ## テスト計画
@@ -47,6 +59,12 @@ Branch: main
 ## リスク
 
 sensor driverが明示validityを露出していない箇所では、更新成功条件をソースに結び付けて定義する必要がある。
+
+## 実装記録（2026-09-08）
+
+- `firmware/stampfly/src/telemetry_validity.{hpp,cpp}` とセンサ更新経路に、ToF/IMU/高度のfreshness・invalid・millis wrap処理を追加した。
+- `usb_bridge.cpp` と `host/stampfly.py` に `telemetry_validity_v1` と canonical STATUS fieldsを追加し、legacy `altitude`/`range` はdebug互換として残した。
+- `firmware/stampfly/tests/test_telemetry_validity.cpp`、host parser tests、`camfly-safe` buildを実行してPASSした。実機ログは未取得のため、最後の受け入れ条件は未完了である。
 
 ## 変更履歴
 

@@ -6,7 +6,13 @@ from host.integration import DryRunSession, FakeSafeTransport, IntegrationState
 from host.replay import ReplayEvent
 
 
-STATUS = "CF1 STATUS claimed=1 armed=0 connected=1 mode=3 voltage=4.1 roll=0 pitch=0 yaw=0 altitude=0 range=0 safe_test=1"
+STATUS = (
+    "CF1 STATUS claimed=1 armed=0 connected=1 mode=3 voltage=4.1 roll=0 pitch=0 yaw=0 "
+    "altitude=0 range=0 altitude_m=0 altitude_valid=0 altitude_age_ms=4294967295 "
+    "altitude_source=tof_imu range_mm=0 range_valid=0 range_age_ms=4294967295 "
+    "range_source=tof_bottom imu_valid=0 imu_age_ms=4294967295 imu_source=bmi270 "
+    "capabilities=telemetry_validity_v1 safe_test=1"
+)
 
 
 class IntegrationTests(unittest.TestCase):

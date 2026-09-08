@@ -204,13 +204,15 @@ case "$action" in
     mkdir -p "$root"
     acquire_lock
     mkdir -p "$root/.staging" "$root/releases"
-    temporary="$root/.staging/$arg.$$"
+    temporary="$root/.staging/$arg-$token"
+    temporary_owned=0
     cleanup_stage() {
-      [ -z "$temporary" ] || rm -rf "$temporary"
+      [ "$temporary_owned" -eq 0 ] || rm -rf "$temporary"
       [ -z "$incoming" ] || rm -f "$incoming"
     }
     trap 'cleanup_stage; rmdir "$root/.deploy.lock" 2>/dev/null || true' EXIT
     mkdir "$temporary"
+    temporary_owned=1
     tar -x -f "$incoming" -C "$temporary"
     [ "$(cat "$temporary/manifest.release_id")" = "$arg" ]
     [ -f "$temporary/SHA256SUMS" ]
@@ -225,7 +227,7 @@ case "$action" in
       exit 0
     fi
     mv "$temporary" "$root/releases/$arg"
-    temporary=
+    temporary_owned=0
     rm -f "$incoming"
     sync
     ;;
@@ -341,9 +343,21 @@ class SSHRunner:
 
 
 class FakeRemoteRunner:
-    """In-memory runner for deploy tests; no filesystem or SSH side effects."""
+    """In-memory remote with explicit failure points and ownership tracking."""
 
-    def __init__(self, *, mac: str = "00:11:22:33:44:55", model: str = "atomcam1", free_kib: int = 100000) -> None:
+    FAILURE_POINTS = frozenset({"transfer", "extract", "hash", "marker", "lock"})
+
+    def __init__(
+        self,
+        *,
+        mac: str = "00:11:22:33:44:55",
+        model: str = "atomcam1",
+        free_kib: int = 100000,
+        failures: Iterable[str] = (),
+    ) -> None:
+        unknown = set(failures) - self.FAILURE_POINTS
+        if unknown:
+            raise ValueError(f"unknown fake failure points: {sorted(unknown)}")
         self.mac = mac
         self.model = model
         self.free_kib = free_kib
@@ -351,6 +365,27 @@ class FakeRemoteRunner:
         self.previous = ""
         self.releases: dict[str, bytes] = {}
         self.calls: list[tuple[str, tuple[str, ...], bytes]] = []
+        self.failures = set(failures)
+        self.temporary: set[str] = set()
+        self.incoming: set[str] = set()
+        self.lock_held = False
+
+    def fail_at(self, point: str) -> None:
+        if point not in self.FAILURE_POINTS:
+            raise ValueError(f"unknown fake failure point: {point}")
+        self.failures.add(point)
+
+    def _maybe_fail(self, point: str) -> None:
+        if point in self.failures:
+            raise DeployError(f"injected remote failure: {point}")
+
+    def _acquire_lock(self) -> None:
+        if self.lock_held or "lock" in self.failures:
+            raise DeployError("remote deploy lock is held")
+        self.lock_held = True
+
+    def _release_lock(self) -> None:
+        self.lock_held = False
 
     def run(self, action: str, args: tuple[str, ...] = (), payload: bytes = b"") -> str:
         self.calls.append((action, args, payload))
@@ -360,25 +395,48 @@ class FakeRemoteRunner:
             return f"ACTIVE={self.active}\nPREVIOUS={self.previous}\nROOT={REMOTE_ROOT}\n"
         if action == "stage":
             release = _safe_release_id(args[0])
-            if release in self.releases:
-                if self.releases[release] == payload:
-                    return "IDEMPOTENT"
-                raise DeployError("release already exists with different content")
-            self.releases[release] = payload
-            return "STAGED"
+            token = args[1] if len(args) > 1 else "unknown"
+            self._acquire_lock()
+            temporary = f"{release}-{token}"
+            self.temporary.add(temporary)
+            self.incoming.add(token)
+            try:
+                self._maybe_fail("transfer")
+                self._maybe_fail("extract")
+                self._maybe_fail("hash")
+                if release in self.releases:
+                    if self.releases[release] == payload:
+                        return "IDEMPOTENT"
+                    raise DeployError("release already exists with different content")
+                self.releases[release] = payload
+                return "STAGED"
+            finally:
+                self.temporary.discard(temporary)
+                self.incoming.discard(token)
+                self._release_lock()
         if action == "activate":
             release = _safe_release_id(args[0])
-            if release not in self.releases:
-                raise DeployError("release is not staged")
-            if self.active:
-                self.previous = self.active
-            self.active = release
-            return "ACTIVATED"
+            self._acquire_lock()
+            try:
+                if release not in self.releases:
+                    raise DeployError("release is not staged")
+                self._maybe_fail("marker")
+                if self.active:
+                    self.previous = self.active
+                self.active = release
+                return "ACTIVATED"
+            finally:
+                self._release_lock()
         if action == "rollback":
-            if not self.previous or self.previous not in self.releases:
-                raise DeployError("previous release is unavailable")
-            self.active, self.previous = self.previous, self.active
-            return "ROLLED_BACK"
+            self._acquire_lock()
+            try:
+                if not self.previous or self.previous not in self.releases:
+                    raise DeployError("previous release is unavailable")
+                self._maybe_fail("marker")
+                self.active, self.previous = self.previous, self.active
+                return "ROLLED_BACK"
+            finally:
+                self._release_lock()
         raise DeployError("unsupported fake action")
 
 
