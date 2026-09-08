@@ -4,7 +4,13 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: completed-scope
+Luna-Ready: no-direct-work
 Branch: codex/20260908-camera-stampfly-dry-run
+
+## Luna Max 着手契約
+
+replay/zero-only integrationと10分safe-hardware acceptanceは完了済み。追加実装はこのissueへ混ぜない。自由飛行・非ゼロ・ARMは後続issueで扱う。
 
 ## 概要
 

@@ -4,7 +4,20 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: coordinator
+Luna-Ready: use-child-issues
 Branch: codex/20260908-ssh-runtime-deploy
+
+## Luna Max 着手契約
+
+core CLI/idempotent stageは実装済み。残りはsoftware failure fixture `ssh-runtime-deploy-fault-injection` とreal strict-SSH確認 `ssh-runtime-deploy-live-rollback` に分割。親を直接拡張しない。
+
+## 実行子issue
+
+1. [failure injection](20260908-ssh-runtime-deploy-fault-injection.md) — fake runnerだけで残software acceptanceを完了。
+2. [live rollback](20260908-ssh-runtime-deploy-live-rollback.md) — 1完了後、strict SSH実機でv1→v2→rollback。
+
+boot image更新は別系統であり、この親issueへ混ぜない。
 
 ## 概要
 

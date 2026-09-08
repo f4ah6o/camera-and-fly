@@ -4,6 +4,12 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: implementation
+Luna-Ready: blocked-on-boot-layout-inspection
+
+## Luna Max 着手契約
+
+boot layout実測後に着手。主対象はversioned selector/attempt stateのpure shell/Python fixtureとinitramfs patch。最初はtempdir fixtureのみで、実カメラへwriteしない。health rollbackはこのissueの後続。
 
 ## 概要
 
@@ -35,4 +41,4 @@ kernel A/B の保証、bootloader変更、内部MTD書き込み、実機 enablem
 
 ## 依存
 
-[20260908-atomcam-boot-layout-inspection](20260908-atomcam-boot-layout-inspection.md)、[20260908-boot-health-rollback](20260908-boot-health-rollback.md)
+[20260908-atomcam-boot-layout-inspection](20260908-atomcam-boot-layout-inspection.md)

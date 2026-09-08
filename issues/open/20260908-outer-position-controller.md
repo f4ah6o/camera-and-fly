@@ -4,6 +4,12 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: implementation
+Luna-Ready: blocked-on-sim-vision-altitude
+
+## Luna Max 着手契約
+
+`flight-dynamics-simulator`、`vision-detector-calibration`、`altitude-command-api`完了後に着手。主対象はpure outer controller + deterministic tests + G1 result。実飛行gainを推測しない。
 
 ## 概要
 
@@ -40,4 +46,4 @@ world 水平誤差を制御し、yaw に応じて `body_frd` へ変換して rol
 
 ## 依存
 
-[20260908-flight-dynamics-simulator](20260908-flight-dynamics-simulator.md)、[20260908-camera-low-latency-stream](20260908-camera-low-latency-stream.md)、校正済み detector 実装、[20260908-altitude-command-api](20260908-altitude-command-api.md)
+[20260908-flight-dynamics-simulator](20260908-flight-dynamics-simulator.md)、[20260908-vision-live-qualification](20260908-vision-live-qualification.md)、[20260908-altitude-command-api](20260908-altitude-command-api.md)

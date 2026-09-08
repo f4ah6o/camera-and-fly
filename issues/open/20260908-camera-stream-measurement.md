@@ -4,7 +4,13 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: completed-scope
+Luna-Ready: no-direct-work
 Branch: codex/20260908-camera-stream-measurement
+
+## Luna Max 着手契約
+
+JPEG measurement基盤と実測reject判断は完了済み。低遅延stream作業は `camera-stream-decoder-adapter` / `camera-stream-live-qualification` へ進む。JPEG endpointを再びclosed-loop採用しない。
 
 ## 概要
 

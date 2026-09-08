@@ -4,7 +4,13 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: completed-scope
+Luna-Ready: no-direct-work
 Branch: codex/20260908-ssh-update-recovery-design
+
+## Luna Max 着手契約
+
+recovery boundary設計と子issue作成は完了済み。実装はboot child chainで行う。source-derived sequential rootfs/kernel updateをatomicと表現しない。
 
 ## 概要
 

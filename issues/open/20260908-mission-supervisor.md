@@ -4,7 +4,13 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: completed-scope
+Luna-Ready: no-direct-work
 Branch: codex/20260908-mission-supervisor
+
+## Luna Max 着手契約
+
+pure mission FSM acceptanceは完了済み。real adapter接続は `flight-adapter-integration` で行う。このissueにhardware I/Oやcontrol gainを追加しない。
 
 ## 概要
 

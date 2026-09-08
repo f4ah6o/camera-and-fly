@@ -4,6 +4,12 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: implementation
+Luna-Ready: blocked-on-rootfs-selector
+
+## Luna Max 着手契約
+
+`initramfs-rootfs-selector` 完了後に着手する。主対象は initramfs selector health state/fixture と userspace health marker helper。fake boot sequenceだけで完了させ、kernel/initramfs failureを自動rollback成功扱いしない。
 
 ## 概要
 

@@ -4,6 +4,12 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: hardware-investigation
+Luna-Ready: yes-if-verified-camera
+
+## Luna Max 着手契約
+
+このissueはread-only実測だけ。operator-verified original Atom Cam 1 と strict known_hosts が揃った場合のみ着手する。対象はmount/layout/tool inventoryとdocs/issue記録。write/reboot/MTD/device探索は禁止。実機identity値はtracked fileへ残さない。
 
 ## 概要
 

@@ -4,7 +4,17 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: coordinator
+Luna-Ready: use-espnow-child-issues
 Branch: codex/20260908-flight-link-design
+
+## Luna Max 着手契約
+
+設計比較とlegacy hardeningは完了済み。未達の採用方式/実測はESP-NOW child chainで行う。この親で新transportを直接実装しない。
+
+## 実行子issue
+
+wire/ownership設計の実装・測定は [ESP-NOW gateway coordinator](20260908-espnow-gateway-flight-link.md) の子issue群へ委譲する。このdesign issueでは新規transport codeを書かない。
 
 ## 概要
 

@@ -4,6 +4,12 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: implementation
+Luna-Ready: blocked-on-layout-and-selector
+
+## Luna Max 着手契約
+
+layout inspection + selector完了後に着手。`host/camera_deploy.py` のstrict SSH runnerを再利用して boot bundle専用stage/commit CLIとfake testsを実装する。rebootは別command、real commitはpower-loss gate前に行わない。
 
 ## 概要
 

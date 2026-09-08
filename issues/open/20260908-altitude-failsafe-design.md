@@ -4,7 +4,13 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: completed-scope
+Luna-Ready: no-direct-work
 Branch: codex/20260908-altitude-failsafe-design
+
+## Luna Max 着手契約
+
+設計・子issue分割は完了済み。このファイルを直接再実装しない。残作業は `telemetry-validity` → `altitude-command-api` → `landing-failsafe-adapter` の子issueで行い、親のsource-derived契約を変更する場合だけ更新する。
 
 ## 概要
 

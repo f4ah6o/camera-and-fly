@@ -4,6 +4,12 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: implementation
+Luna-Ready: blocked-on-semantic-and-link-deps
+
+## Luna Max 着手契約
+
+mission semantic actionを実transportへ接続する統合issue。高度/telemetry/LANDとhost flight-link transportが完了してから着手する。主対象は新規`host/flight_adapter.py`とtests、missionへの最小接続。motor enable/G3/G4は含めない。
 
 ## 概要
 
@@ -36,4 +42,4 @@ action ID の冪等性、telemetry validity、link ownership、grounded feedback
 
 ## 依存
 
-[20260908-mission-supervisor](20260908-mission-supervisor.md)、[20260908-altitude-command-api](20260908-altitude-command-api.md)、[20260908-telemetry-validity](20260908-telemetry-validity.md)、[20260908-landing-failsafe-adapter](20260908-landing-failsafe-adapter.md)、flight-link 実装
+[20260908-mission-supervisor](20260908-mission-supervisor.md)、[20260908-altitude-command-api](20260908-altitude-command-api.md)、[20260908-telemetry-validity](20260908-telemetry-validity.md)、[20260908-landing-failsafe-adapter](20260908-landing-failsafe-adapter.md)、[ESP-NOW host transport](20260908-espnow-host-transport.md)

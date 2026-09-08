@@ -4,7 +4,13 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: implementation
+Luna-Ready: blocked-on-telemetry-validity
 Branch: main
+
+## Luna Max 着手契約
+
+主対象は `firmware/stampfly/src/cf1_protocol.*`、高度action state用の新規pure files、`host/stampfly.py`/host adapter、native/host tests。`telemetry-validity` 完了後に着手し、旧CF1 SET互換を変更しない。検証は native tests、host tests、`camfly-safe` build。実flight enableは含めない。
 
 ## 概要
 

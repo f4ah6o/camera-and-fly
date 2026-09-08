@@ -4,7 +4,20 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: coordinator
+Luna-Ready: use-child-issues
 Branch: main
+
+## Luna Max 着手契約
+
+この親issueでは直接実装しない。softwareは `camera-stream-decoder-adapter`、実機採否は `camera-stream-live-qualification` に分割済み。両方完了後に親acceptance/結論だけ更新する。
+
+## 実行子issue
+
+1. [decoded-frame adapter](20260908-camera-stream-decoder-adapter.md) — software-only。
+2. [live stream qualification](20260908-camera-stream-live-qualification.md) — 1完了後の実機測定。
+
+親acceptanceは2件の結果を統合した時だけ更新する。
 
 ## 概要
 

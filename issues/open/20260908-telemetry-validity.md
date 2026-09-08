@@ -4,7 +4,13 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: implementation
+Luna-Ready: yes
 Branch: main
+
+## Luna Max 着手契約
+
+今すぐ単独着手可能。主対象はfirmware sensor freshness/validity state、CF1 STATUS/capability、`host/stampfly.py` parser、native/host tests。最後に`camfly-safe` zero-output build/logで確認し、flight policyは変更しない。
 
 ## 概要
 

@@ -4,6 +4,12 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: hardware-validation
+Luna-Ready: blocked-on-boot-deploy-and-health
+
+## Luna Max 着手契約
+
+layout/deploy/health完了後、disposable media/imageだけで中断matrixを検証する。target camera power cutは別承認まで実施しない。wrong-disk fail-closed、offline restore/hash/fsckを中心にする。
 
 ## 概要
 

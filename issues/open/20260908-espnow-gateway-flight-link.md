@@ -4,7 +4,21 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: coordinator
+Luna-Ready: use-child-issues
 Branch: main
+
+## Luna Max 着手契約
+
+直接3層を同時実装しない。順序は `espnow-flight-protocol-core` → 並行して `espnow-host-transport` / `espnow-gateway-firmware` / `espnow-stampfly-receiver` → `espnow-link-safe-qualification`。親は設計整合と最終採否だけ更新する。
+
+## 実行子issue
+
+1. [protocol core](20260908-espnow-flight-protocol-core.md) — 最初にpure wire/session contractを固定。
+2. protocol core後、[host transport](20260908-espnow-host-transport.md)、[gateway firmware](20260908-espnow-gateway-firmware.md)、[StampFly receiver](20260908-espnow-stampfly-receiver.md) を独立セッションで実装。
+3. 3層完了後、[safe qualification](20260908-espnow-link-safe-qualification.md) でzero-only実機測定。
+
+この親issueへ3層の実装を直接混ぜない。
 
 ## 概要
 

@@ -4,7 +4,17 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: coordinator
+Luna-Ready: use-child-issue-for-last-hardening
 Branch: codex/20260908-sd-release-verification
+
+## Luna Max 着手契約
+
+manifest/rebuild evidenceは完了済み。残るfailure/signal/concurrency cleanup acceptanceは `sd-build-failure-hardening` で実装する。既存artifactを上書きしない。
+
+## 実行子issue
+
+残る failure/signal/concurrency acceptance は [sd-build-failure-hardening](20260908-sd-build-failure-hardening.md) だけで実装する。既存のverified release再生成を繰り返さない。
 
 ## 概要
 

@@ -4,6 +4,12 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: hardware-validation
+Luna-Ready: blocked-on-g1-g2-g3-and-criteria
+
+## Luna Max 着手契約
+
+G4/G5専用。`flight-criteria-freeze`と全G1-G3/free-flight dependencyが完了するまで着手しない。実施時は全runを保存し、失敗/abortを除外しない。
 
 ## 概要
 
@@ -35,4 +41,4 @@ G0〜G3 を通過した構成だけを対象に、管理された低高度の短
 
 ## 依存
 
-[20260908-flight-build-preflight](20260908-flight-build-preflight.md)、[20260908-outer-position-controller](20260908-outer-position-controller.md)、[20260908-flight-qualification](20260908-flight-qualification.md)
+[20260908-flight-g3-no-prop](20260908-flight-g3-no-prop.md)、[20260908-flight-criteria-freeze](20260908-flight-criteria-freeze.md)、[20260908-outer-position-controller](20260908-outer-position-controller.md)、[20260908-espnow-link-safe-qualification](20260908-espnow-link-safe-qualification.md)、[20260908-vision-live-qualification](20260908-vision-live-qualification.md)

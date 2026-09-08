@@ -4,7 +4,13 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: completed-scope
+Luna-Ready: no-direct-work
 Branch: codex/20260908-host-control-scheduler
+
+## Luna Max 着手契約
+
+deadline-aware scheduler/bounded RX acceptanceは完了済み。後続transportはこのexpiry semanticsを再利用し、heartbeatでgenerated/valid_untilを更新しない。追加変更は具体的回帰issueがある場合だけ行う。
 
 ## 概要
 

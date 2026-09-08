@@ -4,7 +4,17 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: coordinator
+Luna-Ready: use-ready-index
 Branch: codex/20260908-flight-roadmap
+
+## Luna Max 着手契約
+
+全体親。個別実装はこのissueで行わず `issues/open/README.md` のReady Nowから1件選ぶ。子issue完了時のみ依存表/実装記録/親acceptanceを更新する。
+
+## Luna Max 実行インデックス
+
+個別着手順とReady/Blocked判定は [issues/open/README.md](README.md) を正とする。親roadmapから直接実装せず、Ready Now のsoftware issueまたは明示hardware gate付きissueを1件だけ選ぶ。
 
 ## 概要
 

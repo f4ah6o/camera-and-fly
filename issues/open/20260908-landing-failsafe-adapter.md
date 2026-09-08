@@ -4,7 +4,13 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: implementation
+Luna-Ready: blocked-on-altitude-and-telemetry
 Branch: main
+
+## Luna Max 着手契約
+
+telemetry-validityとaltitude-command-api完了後に着手。pure LAND/fallback state + firmware/host adapter + testsを実装し、`camfly-safe`でwire pathまで確認。250ms watchdog変更とflight enableは含めない。
 
 ## 概要
 

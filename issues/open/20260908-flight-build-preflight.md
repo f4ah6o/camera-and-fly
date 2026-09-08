@@ -4,6 +4,20 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: coordinator
+Luna-Ready: use-child-issues
+
+## Luna Max 着手契約
+
+直接flight build+preflight+実機G3を一括で扱わない。`flight-build-environment` → `flight-preflight-gate` → `flight-g3-no-prop` の順に進め、親は3件の完了記録だけ更新する。
+
+## 実行子issue
+
+1. [flight build environment](20260908-flight-build-environment.md) — build separationのみ。
+2. [preflight gate](20260908-flight-preflight-gate.md) — host fail-closed logicのみ。
+3. [G3 no-prop](20260908-flight-g3-no-prop.md) — 1/2完了後の実機検証のみ。
+
+この親issueではmotor-capable build作成と実機試験を同一セッションで行わない。
 
 ## 概要
 

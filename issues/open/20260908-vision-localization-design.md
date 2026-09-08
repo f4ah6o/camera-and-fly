@@ -4,7 +4,21 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: coordinator
+Luna-Ready: use-child-issues
 Branch: codex/20260908-vision-localization-design
+
+## Luna Max 着手契約
+
+pure `PoseObservation`/quality gateは実装済み。残りは `camera-stream-live-qualification` → `vision-detector-calibration` → `vision-live-qualification`。親でdetector導入や実測を一括実施しない。
+
+## 実行子issue
+
+1. [camera live qualification](20260908-camera-stream-live-qualification.md) で観測streamを選定。
+2. [detector/calibration](20260908-vision-detector-calibration.md) をsoftware-onlyで実装。
+3. [vision live qualification](20260908-vision-live-qualification.md) で3高さ×5位置等を実測。
+
+既存`host/vision.py`のpure contractは完成済みで、再実装しない。
 
 ## 概要
 

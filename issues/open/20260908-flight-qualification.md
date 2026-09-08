@@ -4,7 +4,23 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: coordinator
+Luna-Ready: use-child-issues
 Branch: codex/20260908-flight-qualification
+
+## Luna Max 着手契約
+
+qualification evaluatorとstage設計は実装済み。残る定量criteria確定は `flight-criteria-freeze`、G1/G3/G4/G5は各子issueで実施する。親候補値を未測定のまま合格閾値にしない。
+
+## 実行子issue
+
+- [G1 simulator](20260908-flight-dynamics-simulator.md)
+- [outer position controller](20260908-outer-position-controller.md)
+- [flight build/preflight coordinator](20260908-flight-build-preflight.md)
+- [criteria freeze](20260908-flight-criteria-freeze.md)
+- [G4/G5 staged flight](20260908-staged-flight-test.md)
+
+`host/qualification.py`は実装済み。未測定値を親issueの候補数値から自動採用しない。
 
 ## 概要
 

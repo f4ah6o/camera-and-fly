@@ -4,6 +4,12 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: implementation
+Luna-Ready: yes
+
+## Luna Max 着手契約
+
+このissueは実機不要で単独着手可能。`host/flight_sim.py` + testsをpure/fake-clockで実装し、`host/qualification.py` schemaへ出力する。controller本体、実flight parameter同定、hardware I/Oは触らない。検証はhost test suite。
 
 ## 概要
 

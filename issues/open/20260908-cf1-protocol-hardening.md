@@ -4,7 +4,17 @@ Status: open
 Model: GPT-5.6 Sol
 Created: 2026-09-08
 Updated: 2026-09-08
+Kind: coordinator
+Luna-Ready: use-child-issue-for-last-hardware-gate
 Branch: codex/20260908-cf1-protocol-hardening
+
+## Luna Max 着手契約
+
+pure/native hardeningは完了済み。残る実USB RX flood/TX backpressure acceptanceは `cf1-usb-flood-qualification` だけで実施する。親codeを再設計しない。
+
+## 実行子issue
+
+software/native hardeningは完了済み。最後の実USB scheduling acceptanceだけを [cf1-usb-flood-qualification](20260908-cf1-usb-flood-qualification.md) でzero-only検証する。
 
 ## 概要
 
