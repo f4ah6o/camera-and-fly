@@ -74,6 +74,10 @@ void set_duty_rl(float duty);
 // グローバル変数
 extern volatile uint8_t Mode;
 extern volatile uint8_t Loop_flag;
+extern volatile uint32_t camfly_loop_count;
+extern volatile uint32_t camfly_last_loop_period_us;
+extern volatile uint32_t camfly_last_sensor_us;
+extern volatile uint32_t camfly_max_sensor_us;
 extern float Control_period;
 extern volatile float Elapsed_time;
 

@@ -25,6 +25,7 @@
 
 #include <Arduino.h>
 #include "tof.hpp"
+#include <vl53lx_register_map.h>
 
 VL53LX_Dev_t tof_front;
 VL53LX_Dev_t tof_bottom;
@@ -33,9 +34,11 @@ VL53LX_DEV ToF_front  = &tof_front;
 VL53LX_DEV ToF_bottom = &tof_bottom;
 
 volatile uint8_t ToF_bottom_data_ready_flag;
+volatile ToFDiagnostics ToF_bottom_diagnostics;
 
 void IRAM_ATTR tof_int() {
     ToF_bottom_data_ready_flag = 1;
+    ++ToF_bottom_diagnostics.data_ready_count;
 }
 
 int16_t tof_bottom_get_range() {
@@ -49,6 +52,21 @@ int16_t tof_front_get_range() {
 void tof_init(void) {
     uint8_t byteData;
     uint16_t wordData;
+
+    ToF_bottom_data_ready_flag = 0;
+    ToF_bottom_diagnostics.raw_range_mm = 0;
+    ToF_bottom_diagnostics.data_ready_status = 0;
+    ToF_bottom_diagnostics.data_ready = 0;
+    ToF_bottom_diagnostics.raw_stream_status = 0;
+    ToF_bottom_diagnostics.raw_stream_count = 0;
+    ToF_bottom_diagnostics.get_status = 0;
+    ToF_bottom_diagnostics.restart_status = 0;
+    ToF_bottom_diagnostics.init_clear_status = 0;
+    ToF_bottom_diagnostics.init_start_status = 0;
+    ToF_bottom_diagnostics.object_count = 0;
+    ToF_bottom_diagnostics.range_status = VL53LX_RANGESTATUS_NONE;
+    ToF_bottom_diagnostics.stream_count = 0;
+    ToF_bottom_diagnostics.data_ready_count = 0;
 
     ToF_bottom->comms_speed_khz   = 400;
     ToF_bottom->i2c_slave_address = 0x29;
@@ -106,9 +124,13 @@ void tof_init(void) {
 
     attachInterrupt(INT_BOTTOM, &tof_int, FALLING);
 
-    VL53LX_ClearInterruptAndStartMeasurement(ToF_bottom);
-    delay(100);
-    USBSerial.printf("#Start Measurement Status:%d\n\r", VL53LX_StartMeasurement(ToF_bottom));
+    // Start the first ranging sequence once.  ClearInterruptAndStartMeasurement
+    // is used after GetMultiRangingData() for subsequent measurements; calling
+    // it before StartMeasurement resets the lifecycle ordering expected by the
+    // vendored VL53LX API.
+    const VL53LX_Error init_start_status = VL53LX_StartMeasurement(ToF_bottom);
+    ToF_bottom_diagnostics.init_start_status = init_start_status;
+    USBSerial.printf("#Start Measurement Status:%d\n\r", init_start_status);
 }
 
 int16_t tof_range_get(VL53LX_DEV dev) {
@@ -118,14 +140,23 @@ int16_t tof_range_get(VL53LX_DEV dev) {
     int16_t range_ave;
     uint8_t count;
 
-    VL53LX_MultiRangingData_t MultiRangingData;
+    VL53LX_MultiRangingData_t MultiRangingData = {};
     VL53LX_MultiRangingData_t *pMultiRangingData = &MultiRangingData;
 
+    uint8_t data_ready = 0;
+    const VL53LX_Error data_ready_status = VL53LX_GetMeasurementDataReady(dev, &data_ready);
+    uint8_t raw_stream_count = 0;
+    const VL53LX_Error raw_stream_status = VL53LX_RdByte(dev, VL53LX_RESULT__STREAM_COUNT, &raw_stream_count);
+
     // uint32_t start_time = micros();
-    VL53LX_GetMultiRangingData(dev, pMultiRangingData);
+    const VL53LX_Error get_status = VL53LX_GetMultiRangingData(dev, pMultiRangingData);
     // uint32_t end_time = micros();
     // USBSerial.printf("ToF Time%f\n", (float)(end_time - start_time)*1.0e-6);
-    uint8_t no_of_object_found = pMultiRangingData->NumberOfObjectsFound;
+    const uint8_t reported_object_count = pMultiRangingData->NumberOfObjectsFound;
+    uint8_t no_of_object_found = reported_object_count;
+    if (no_of_object_found > VL53LX_MAX_RANGE_RESULTS) no_of_object_found = VL53LX_MAX_RANGE_RESULTS;
+    const uint8_t range_status = pMultiRangingData->RangeData[0].RangeStatus;
+    const int16_t raw_range_mm = pMultiRangingData->RangeData[0].RangeMilliMeter;
     // USBSerial.printf("Total N=%d ",no_of_object_found);
     range_min = 10000;
     range_max = 0;
@@ -148,8 +179,39 @@ int16_t tof_range_get(VL53LX_DEV dev) {
         // USBSerial.printf("Max %d mm\n\r", range_max);
         if (count != 0) range_ave = range_ave / count;
     }
-    VL53LX_ClearInterruptAndStartMeasurement(dev);
+    const VL53LX_Error restart_status = VL53LX_ClearInterruptAndStartMeasurement(dev);
+    if (dev == ToF_bottom) {
+        ToF_bottom_diagnostics.raw_range_mm = raw_range_mm;
+        ToF_bottom_diagnostics.data_ready_status = data_ready_status;
+        ToF_bottom_diagnostics.data_ready = data_ready;
+        ToF_bottom_diagnostics.raw_stream_status = raw_stream_status;
+        ToF_bottom_diagnostics.raw_stream_count = raw_stream_count;
+        ToF_bottom_diagnostics.get_status = get_status;
+        ToF_bottom_diagnostics.restart_status = restart_status;
+        ToF_bottom_diagnostics.object_count = reported_object_count;
+        ToF_bottom_diagnostics.range_status = range_status;
+        ToF_bottom_diagnostics.stream_count = pMultiRangingData->StreamCount;
+    }
+    if (get_status != VL53LX_ERROR_NONE || restart_status != VL53LX_ERROR_NONE) return 0;
     return range_max;
+}
+
+ToFDiagnostics tof_bottom_diagnostics() {
+    ToFDiagnostics result;
+    result.raw_range_mm = ToF_bottom_diagnostics.raw_range_mm;
+    result.data_ready_status = ToF_bottom_diagnostics.data_ready_status;
+    result.data_ready = ToF_bottom_diagnostics.data_ready;
+    result.raw_stream_status = ToF_bottom_diagnostics.raw_stream_status;
+    result.raw_stream_count = ToF_bottom_diagnostics.raw_stream_count;
+    result.get_status = ToF_bottom_diagnostics.get_status;
+    result.restart_status = ToF_bottom_diagnostics.restart_status;
+    result.init_clear_status = ToF_bottom_diagnostics.init_clear_status;
+    result.init_start_status = ToF_bottom_diagnostics.init_start_status;
+    result.object_count = ToF_bottom_diagnostics.object_count;
+    result.range_status = ToF_bottom_diagnostics.range_status;
+    result.stream_count = ToF_bottom_diagnostics.stream_count;
+    result.data_ready_count = ToF_bottom_diagnostics.data_ready_count;
+    return result;
 }
 
 void tof_test_ranging(VL53LX_DEV dev) {

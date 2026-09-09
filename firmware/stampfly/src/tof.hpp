@@ -42,4 +42,22 @@ void tof_test_ranging(VL53LX_DEV dev);
 int16_t tof_bottom_get_range();
 int16_t tof_front_get_range();
 
+struct ToFDiagnostics {
+    int16_t raw_range_mm = 0;
+    int8_t data_ready_status = 0;
+    uint8_t data_ready = 0;
+    int8_t raw_stream_status = 0;
+    uint8_t raw_stream_count = 0;
+    int8_t get_status = 0;
+    int8_t restart_status = 0;
+    int8_t init_clear_status = 0;
+    int8_t init_start_status = 0;
+    uint8_t object_count = 0;
+    uint8_t range_status = VL53LX_RANGESTATUS_NONE;
+    uint8_t stream_count = 0;
+    uint32_t data_ready_count = 0;
+};
+
+ToFDiagnostics tof_bottom_diagnostics();
+
 #endif

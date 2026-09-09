@@ -170,6 +170,10 @@ int8_t BtnA_counter                   = 0;
 uint8_t BtnA_on_flag                  = 0;
 uint8_t BtnA_off_flag                 = 1;
 volatile uint8_t Loop_flag            = 0;
+volatile uint32_t camfly_loop_count = 0;
+volatile uint32_t camfly_last_loop_period_us = 0;
+volatile uint32_t camfly_last_sensor_us = 0;
+volatile uint32_t camfly_max_sensor_us = 0;
 // volatile uint8_t Angle_control_flag = 0;
 uint8_t Stick_return_flag     = 0;
 uint8_t Throttle_control_mode = 0;
@@ -255,7 +259,14 @@ void init_copter(void) {
     led_show();
 
     // Initialize Serial communication
+    // CF1 STATUS carries the validity contract and bounded diagnostics.  Set
+    // the ESP32-S3 USB CDC TX ring before begin(); calling setTxBufferSize()
+    // after begin() recreates the ring while USB interrupts may use it.
+    USBSerial.setTxBufferSize(1024);
     USBSerial.begin(115200);
+    // usb_bridge_poll() retries one bounded pending frame instead of waiting
+    // for the host.  Keep the Arduino USB write path non-blocking as well.
+    USBSerial.setTxTimeoutMs(0);
     usb_bridge_init();
     delay(1500);
     USBSerial.printf("Start StampFly!\r\n");
@@ -291,10 +302,17 @@ void init_copter(void) {
 // Main loop
 void loop_400Hz(void) {
     static uint8_t led = 1;
+    static uint32_t previous_loop_start_us = 0;
     float sense_time;
     // 割り込みにより400Hzで以降のコードが実行
     while (Loop_flag == 0);
     Loop_flag = 0;
+    const uint32_t loop_start_us = micros();
+    if (previous_loop_start_us != 0) {
+        camfly_last_loop_period_us = loop_start_us - previous_loop_start_us;
+    }
+    previous_loop_start_us = loop_start_us;
+    ++camfly_loop_count;
     usb_bridge_poll();
 
     E_time           = micros();
@@ -305,6 +323,8 @@ void loop_400Hz(void) {
 
     // Read Sensor Value
     sense_time       = sensor_read();
+    camfly_last_sensor_us = static_cast<uint32_t>(sense_time * 1000000.0f);
+    if (camfly_last_sensor_us > camfly_max_sensor_us) camfly_max_sensor_us = camfly_last_sensor_us;
     uint32_t cs_time = micros();
 
     // LED Drive
