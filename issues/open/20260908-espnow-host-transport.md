@@ -1,9 +1,9 @@
 # Mac host の ESP-NOW gateway transport adapter を実装する
 
 Status: open
-Model: GPT-5.6 Sol
+Model: GPT-5
 Created: 2026-09-08
-Updated: 2026-09-08
+Updated: 2026-09-09
 Kind: implementation
 Luna-Ready: blocked-on-protocol-core
 Branch: main
@@ -30,11 +30,26 @@ Branch: main
 
 ## 受け入れ条件
 
-- [ ] explicit port/identity boundaryがある。
-- [ ] session/sequence/TTL/application ACKをprotocol coreと一致して扱う。
-- [ ] partial/duplicate/reorder/disconnectがbounded testでPASSする。
-- [ ] stale producerをtransport heartbeatで延命しない。
-- [ ] reconnectでclaim/ARM/old SETを自動復元しない。
+- [x] explicit port/identity boundaryがある。
+- [x] session/sequence/TTL/application ACKをprotocol coreと一致して扱う。
+- [x] partial/duplicate/reorder/disconnectがbounded testでPASSする。
+- [x] stale producerをtransport heartbeatで延命しない。
+- [x] reconnectでclaim/ARM/old SETを自動復元しない。
+
+## 実装記録（2026-09-09）
+
+- `host/flight_link.py` に、明示serial portだけを開く version-1 binary
+  transport、bounded partial-frame decoder、strict application ACK matching、
+  RF-delivery ACKの分離、sequence exhaustion、DISARM/EMERGENCY_STOP、
+  explicit new-session reconnectを追加した。
+- `host/tests/test_flight_link.py` に fake serial を追加し、partial frame、
+  CRC resynchronization、duplicate/reordered/foreign ACK、timeout、disconnect、
+  sequence exhaustion、scheduler expiry、reconnect/no-rearmを検証した。
+- `CHANGES.md` と `docs/flight-link-design.md` に software-only の範囲と
+  hardware未接続の境界を追記した。
+- `.venv/bin/python -m unittest host.tests.test_flight_link -v`、host全体、
+  native protocol tests、`camfly-safe` buildがPASSした。実gateway測定、
+  ESP-NOW接続、ARM/non-zero hardware SETは実施していない。
 
 ## Luna Max 着手契約
 

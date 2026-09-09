@@ -13,6 +13,9 @@
   CF1 STATUS with fail-closed host parsing.
 - Added a pure version-1 flight-link packet/session core in C++ and Python,
   including CRC, TTL, sequence, ACK-class, and re-session semantics.
+- Added an explicit-port host flight-link adapter with bounded frame/ACK
+  handling and reconnect/no-rearm fake-serial coverage
+  ([issue](issues/open/20260908-espnow-host-transport.md)).
 - Added a bounded decoded-frame adapter and FFmpeg/synthetic probe, plus a
   deterministic delayed/lossy flight-dynamics fixture for G1 evidence.
 - Added manifest verification for read-only SD artifacts and an explicit,

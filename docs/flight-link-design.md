@@ -126,3 +126,11 @@ stale, wrong-session, and post-exhaustion packets before changing state. A new
 CLAIM replaces the old session with a disarmed zero setpoint. The TTL is
 enforced using the receiver-local monotonic clock after acceptance. The legacy
 25-byte RC format and ESP-NOW API remain outside this implementation.
+
+The software-only Mac adapter is implemented in `host/flight_link.py`. It
+requires an explicit serial port, uses the shared Python codec, and bounds the
+partial-frame and pending-packet buffers. It waits only for a matching
+application ACK; RF-delivery indications are recorded separately. A failed
+endpoint must be explicitly reconnected, which creates a new session and does
+not restore SET or ARM state. The adapter has no ARM method and is not a
+gateway or aircraft receiver.

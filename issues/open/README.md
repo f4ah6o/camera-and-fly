@@ -116,6 +116,7 @@ Parent coordinators: [flight-qualification](20260908-flight-qualification.md), [
 These files remain as contracts/history and should not be selected as implementation tasks:
 
 - [camera-stream-decoder-adapter](20260908-camera-stream-decoder-adapter.md) — software adapter/fixtures complete; live qualification remains separate
+- [espnow-host-transport](20260908-espnow-host-transport.md) — explicit-port software adapter/fixtures complete; gateway qualification remains separate
 - [flight-dynamics-simulator](20260908-flight-dynamics-simulator.md) — deterministic G1 simulator complete
 - [camera-stream-measurement](20260908-camera-stream-measurement.md)
 - [camera-stampfly-dry-run](20260908-camera-stampfly-dry-run.md)
