@@ -4,6 +4,10 @@ Atom Cam 1 supplies local vision input, the Mac runs the vision and flight
 policy, and an M5Stack StampFly keeps the existing stabilization loop and
 hard failsafe.
 
+Closed-loop architecture and responsibility boundaries are documented in
+`docs/camera-stampfly-control-architecture.md`. Luna Max implementation order is
+tracked by `issues/open/20260909-camera-stampfly-closed-loop.md`.
+
 ~~~text
 Atom Cam 1
     │ local JPEG / RTSP / WebRTC

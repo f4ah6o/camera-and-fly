@@ -1,6 +1,6 @@
 # Open issues — Luna Max execution index
 
-Updated: 2026-09-08
+Updated: 2026-09-09
 
 このディレクトリの issue は **1 issue = 1 Luna Max 実装/検証セッション** を原則とする。親 coordinator から直接実装を始めず、`Luna-Ready` と依存を確認して子 issue を1件だけ選ぶ。
 
@@ -18,9 +18,6 @@ Updated: 2026-09-08
 
 | Issue | 1セッションの成果 |
 |---|---|
-| [telemetry-validity](20260908-telemetry-validity.md) | altitude/ToF/IMU validity + CF1/host parser + tests |
-| [flight-dynamics-simulator](20260908-flight-dynamics-simulator.md) | deterministic G1 simulator + qualification JSONL |
-| [camera-stream-decoder-adapter](20260908-camera-stream-decoder-adapter.md) | bounded decoded-frame worker/probe + fixtures |
 | [espnow-flight-protocol-core](20260908-espnow-flight-protocol-core.md) | pure wire/session codec/state + tests |
 | [sd-build-failure-hardening](20260908-sd-build-failure-hardening.md) | build failure/signal/concurrency fake tests |
 | [ssh-runtime-deploy-fault-injection](20260908-ssh-runtime-deploy-fault-injection.md) | deploy interruption/concurrency/idempotency fixtures |
@@ -31,8 +28,22 @@ Updated: 2026-09-08
 |---|---|
 | [atomcam-boot-layout-inspection](20260908-atomcam-boot-layout-inspection.md) | operator-verified original Atom Cam 1 + strict known_hosts; read-only only |
 | [cf1-usb-flood-qualification](20260908-cf1-usb-flood-qualification.md) | explicit StampFly port + `camfly-safe`; zero SET / ARM 0 only |
+| [telemetry-validity](20260908-telemetry-validity.md) | software contract complete; remaining fake-clock + `camfly-safe` validity transition acceptance only |
 
 ## Dependency chains
+
+### Camera → StampFly closed-loop integration
+
+Coordinator: [camera-stampfly-closed-loop](20260909-camera-stampfly-closed-loop.md). Architecture: `../../docs/camera-stampfly-control-architecture.md`.
+
+Existing camera/vision + altitude + ESP-NOW chains
+→ `outer-position-controller`
+→ [vision-control-runtime-integration](20260909-vision-control-runtime-integration.md)
+→ `flight-adapter-integration`
+→ [camera-stampfly-closed-loop-safe-qualification](20260909-camera-stampfly-closed-loop-safe-qualification.md)
+→ `flight-build-environment` → `flight-preflight-gate` → `flight-g3-no-prop` → `flight-criteria-freeze` → `staged-flight-test`.
+
+The two new implementation/qualification issues are blocked until their explicit dependencies are complete; do not select them early.
 
 ### Camera / vision
 
@@ -104,6 +115,8 @@ Parent coordinators: [flight-qualification](20260908-flight-qualification.md), [
 
 These files remain as contracts/history and should not be selected as implementation tasks:
 
+- [camera-stream-decoder-adapter](20260908-camera-stream-decoder-adapter.md) — software adapter/fixtures complete; live qualification remains separate
+- [flight-dynamics-simulator](20260908-flight-dynamics-simulator.md) — deterministic G1 simulator complete
 - [camera-stream-measurement](20260908-camera-stream-measurement.md)
 - [camera-stampfly-dry-run](20260908-camera-stampfly-dry-run.md)
 - [host-control-scheduler](20260908-host-control-scheduler.md)
