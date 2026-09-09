@@ -6,9 +6,11 @@ from host.mission import (
     ActionKind,
     HealthSnapshot,
     MissionConfig,
+    MissionContext,
     MissionState,
     MissionSupervisor,
     OperatorEvent,
+    step,
 )
 
 
@@ -30,6 +32,45 @@ def healthy(**changes):
 
 
 class MissionTests(unittest.TestCase):
+    def test_emergency_stop_covers_unsafe_idle_and_complete_physical_states(self):
+        cases = [
+            (MissionState.IDLE, healthy(armed=True)),
+            (MissionState.IDLE, healthy(grounded=False)),
+            (MissionState.COMPLETE, healthy(armed=True)),
+            (MissionState.COMPLETE, healthy(grounded=False)),
+        ]
+        for state, snapshot in cases:
+            with self.subTest(state=state, snapshot=snapshot):
+                transition = step(
+                    MissionContext(state=state),
+                    OperatorEvent.EMERGENCY_STOP,
+                    snapshot,
+                    1.0,
+                )
+                self.assertEqual(transition.context.state, MissionState.FAULT)
+                self.assertEqual(transition.action.kind, ActionKind.EMERGENCY_STOP)
+                self.assertEqual(transition.action.reason, "operator_emergency_stop")
+                self.assertEqual(transition.action.action_id, 1)
+
+    def test_safe_idle_and_complete_keep_normal_event_behavior(self):
+        cases = [
+            (MissionState.IDLE, OperatorEvent.NONE, MissionState.IDLE, ActionKind.NONE),
+            (MissionState.COMPLETE, OperatorEvent.NONE, MissionState.COMPLETE, ActionKind.NONE),
+            (MissionState.COMPLETE, OperatorEvent.RESET, MissionState.IDLE, ActionKind.RESET),
+            (MissionState.IDLE, OperatorEvent.EMERGENCY_STOP, MissionState.IDLE, ActionKind.NONE),
+            (MissionState.COMPLETE, OperatorEvent.EMERGENCY_STOP, MissionState.COMPLETE, ActionKind.NONE),
+        ]
+        for state, event, expected_state, expected_action in cases:
+            with self.subTest(state=state, event=event):
+                transition = step(
+                    MissionContext(state=state),
+                    event,
+                    healthy(),
+                    1.0,
+                )
+                self.assertEqual(transition.context.state, expected_state)
+                self.assertEqual(transition.action.kind, expected_action)
+
     def test_normal_sequence_requires_explicit_events_and_feedback(self):
         mission = MissionSupervisor()
         self.assertEqual(mission.step(OperatorEvent.NONE, healthy(), 0).action.kind, ActionKind.NONE)

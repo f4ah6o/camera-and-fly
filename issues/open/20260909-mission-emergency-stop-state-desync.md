@@ -1,7 +1,7 @@
 # P1-1: IDLE / COMPLETE でも EMERGENCY_STOP を欠落させない
 
 Status: open
-Model: Luna Max
+Model: unknown
 Created: 2026-09-09
 Updated: 2026-09-09
 Kind: implementation
@@ -55,13 +55,13 @@ operator の `EMERGENCY_STOP` を state-specific な通常遷移より先に評�
 
 ## 受け入れ条件
 
-- [ ] `IDLE + armed=True + EMERGENCY_STOP` が `ActionKind.EMERGENCY_STOP` を返す。
-- [ ] `IDLE + grounded=False + EMERGENCY_STOP` が `ActionKind.EMERGENCY_STOP` を返す。
-- [ ] `COMPLETE + armed=True + EMERGENCY_STOP` が `ActionKind.EMERGENCY_STOP` を返す。
-- [ ] `COMPLETE + grounded=False + EMERGENCY_STOP` を含め、異常な実機状態で停止 action が抑制されない。
-- [ ] 正常な `IDLE` / `COMPLETE` の通常入力は、既存どおり `NONE` または `RESET` と state を返す。
-- [ ] emergency-stop の処理で ARM、TAKEOFF、通常 SET 相当の semantic action が同じ transition から生成されない。
-- [ ] 既存の active-state emergency stop、FAULT latch、action ID のテストが回帰しない。
+- [x] `IDLE + armed=True + EMERGENCY_STOP` が `ActionKind.EMERGENCY_STOP` を返す。
+- [x] `IDLE + grounded=False + EMERGENCY_STOP` が `ActionKind.EMERGENCY_STOP` を返す。
+- [x] `COMPLETE + armed=True + EMERGENCY_STOP` が `ActionKind.EMERGENCY_STOP` を返す。
+- [x] `COMPLETE + grounded=False + EMERGENCY_STOP` を含め、異常な実機状態で停止 action が抑制されない。
+- [x] 正常な `IDLE` / `COMPLETE` の通常入力は、既存どおり `NONE` または `RESET` と state を返す。
+- [x] emergency-stop の処理で ARM、TAKEOFF、通常 SET 相当の semantic action が同じ transition から生成されない。
+- [x] 既存の active-state emergency stop、FAULT latch、action ID のテストが回帰しない。
 
 ## 必須tests
 
@@ -89,7 +89,13 @@ operator の `EMERGENCY_STOP` を state-specific な通常遷移より先に評�
 
 ## 変更履歴
 
-`CHANGES.md` impact: yes。これは safety-visible な emergency-stop behavior の修正候補だが、この issue 作成コミットでは `CHANGES.md` を変更しない。実装完了時に既存の変更履歴規約を確認する。
+`CHANGES.md` impact: yes。実装内容を `CHANGES.md` の Unreleased に記録した。
+
+## 実装記録（2026-09-09）
+
+- `mission.step()` は、IDLE / COMPLETE でも physical health が `armed=True` または `grounded=False` の EMERGENCY_STOP を FAULT latch と semantic emergency-stop action へ変換する。正常な IDLE / COMPLETE の NONE / RESET と、安全な状態での emergency-stop no-op は維持した。
+- `host/tests/test_mission.py` に4つの異常物理状態ケースと table-driven regression を追加した。
+- `.venv/bin/python -m unittest host.tests.test_mission -v`、`.venv/bin/python -m unittest discover -s host/tests -v`、`git diff --check` が PASS。実機・hardware acceptance は実施していない。
 
 ## Luna Max 着手契約
 

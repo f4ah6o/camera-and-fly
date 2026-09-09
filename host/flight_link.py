@@ -301,6 +301,10 @@ class FlightLink:
         self._pending_packet_drops = 0
         self._foreign_packet_count = 0
         self._duplicate_ack_count = 0
+        self._seen_ack_sequences: set[int] = set()
+        self._ack_sequence_order: Deque[int] = deque(maxlen=max_pending_packets)
+        self._completed_ack_targets: set[tuple[MessageKind, int]] = set()
+        self._completed_ack_order: Deque[tuple[MessageKind, int]] = deque(maxlen=max_pending_packets)
 
     def __enter__(self) -> "FlightLink":
         return self
@@ -419,6 +423,7 @@ class FlightLink:
             elif self._serial_injected:
                 closed = getattr(self._serial, "closed", False)
                 if isinstance(closed, bool) and closed:
+                    self._mark_reconnect_failed()
                     raise FlightLinkDisconnected(
                         "a reopened serial_instance is required after close"
                     )
@@ -427,7 +432,17 @@ class FlightLink:
                     self._serial.close()
                 except (OSError, SerialException):
                     pass
-                self._serial = self._open_serial()
+                try:
+                    new_serial = self._open_serial()
+                except FlightLinkTransportError:
+                    self._mark_reconnect_failed()
+                    raise
+                except (OSError, SerialException) as exc:
+                    self._mark_reconnect_failed()
+                    raise FlightLinkDisconnected(
+                        f"cannot reopen explicit serial port {self.port}: {exc}"
+                    ) from exc
+                self._serial = new_serial
             self._closed = False
             self._faulted = False
             self._reset_session()
@@ -665,14 +680,25 @@ class FlightLink:
         self._decoder.reset()
         self._pending_packets.clear()
         self._unmatched_packets.clear()
+        self._seen_ack_sequences.clear()
+        self._ack_sequence_order.clear()
+        self._completed_ack_targets.clear()
+        self._completed_ack_order.clear()
 
     def _mark_disconnected(self) -> None:
         self._faulted = True
         self._reset_session()
 
+    def _mark_reconnect_failed(self) -> None:
+        """Clear every claim/control invariant after an open failure."""
+
+        self._closed = False
+        self._reset_session()
+        self._faulted = True
+
     def _open_serial(self) -> Any:
         if serial is None:
-            raise FlightLinkTransportError("pyserial is required for a live flight-link connection")
+            raise FlightLinkDisconnected("pyserial is required for a live flight-link connection")
         try:
             return serial.Serial(
                 port=self.port,
@@ -710,32 +736,52 @@ class FlightLink:
             packet = self._next_packet_until(deadline)
             if packet is None:
                 break
-            if packet.session_id != self._session_id:
-                self._foreign_packet_count += 1
+            ack = self._consume_ack_packet(packet, target)
+            if ack is None:
                 continue
-            if packet.kind is not MessageKind.ACK:
-                self._remember_unmatched(packet)
-                continue
-            if packet.sequence <= self._last_ack_sequence:
-                self._duplicate_ack_count += 1
-                continue
-            self._last_ack_sequence = packet.sequence
-            ack = decode_ack(packet)
-            if ack.ack_class is AckClass.RF_DELIVERY:
-                if self._ack_matches(ack, target):
-                    self._last_delivery_ack = DeliveryAck(packet, ack)
-                continue
-            if not self._ack_matches(ack, target):
-                self._remember_unmatched(packet)
-                continue
-            if not ack.accepted:
-                raise FlightLinkRejected(
-                    f"peer rejected {target.kind.name} sequence {target.sequence}"
-                )
+            self._remember_completed_ack(target)
+            # A response chunk can contain application and RF-delivery ACKs
+            # in either order.  Consume already-buffered packets before
+            # returning so a same-command delivery indication is not left for
+            # the next command's wait.
+            self._drain_pending_ack_packets(target)
             return ack
         raise FlightLinkTimeout(
             f"timeout waiting for application ACK for {target.kind.name} sequence {target.sequence}"
         )
+
+    def _consume_ack_packet(self, packet: Packet, target: Packet) -> Ack | None:
+        if packet.session_id != self._session_id:
+            self._foreign_packet_count += 1
+            return None
+        if packet.kind is not MessageKind.ACK:
+            self._remember_unmatched(packet)
+            return None
+
+        ack = decode_ack(packet)
+        if packet.sequence in self._seen_ack_sequences:
+            self._duplicate_ack_count += 1
+            return None
+        self._remember_ack_sequence(packet.sequence)
+        if ack.ack_class is AckClass.RF_DELIVERY:
+            if self._ack_matches(ack, target):
+                self._last_delivery_ack = DeliveryAck(packet, ack)
+            return None
+        if not self._ack_matches(ack, target):
+            self._remember_unmatched(packet)
+            return None
+        if self._ack_target_key(target) in self._completed_ack_targets:
+            self._duplicate_ack_count += 1
+            return None
+        if not ack.accepted:
+            raise FlightLinkRejected(
+                f"peer rejected {target.kind.name} sequence {target.sequence}"
+            )
+        return ack
+
+    def _drain_pending_ack_packets(self, target: Packet) -> None:
+        while self._pending_packets:
+            self._consume_ack_packet(self._pending_packets.popleft(), target)
 
     @staticmethod
     def _ack_matches(ack: Ack, target: Packet) -> bool:
@@ -786,6 +832,26 @@ class FlightLink:
 
     def _remember_unmatched(self, packet: Packet) -> None:
         self._unmatched_packets.append(packet)
+
+    def _remember_ack_sequence(self, sequence: int) -> None:
+        if len(self._ack_sequence_order) >= self._max_pending_packets:
+            evicted = self._ack_sequence_order.popleft()
+            self._seen_ack_sequences.discard(evicted)
+        self._ack_sequence_order.append(sequence)
+        self._seen_ack_sequences.add(sequence)
+        self._last_ack_sequence = max(self._last_ack_sequence, sequence)
+
+    @staticmethod
+    def _ack_target_key(packet: Packet) -> tuple[MessageKind, int]:
+        return packet.kind, packet.sequence
+
+    def _remember_completed_ack(self, target: Packet) -> None:
+        key = self._ack_target_key(target)
+        if len(self._completed_ack_order) >= self._max_pending_packets:
+            evicted = self._completed_ack_order.popleft()
+            self._completed_ack_targets.discard(evicted)
+        self._completed_ack_order.append(key)
+        self._completed_ack_targets.add(key)
 
 
 # Names that make the adapter easy to discover without introducing separate

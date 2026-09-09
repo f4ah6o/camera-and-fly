@@ -16,6 +16,9 @@
 - Added an explicit-port host flight-link adapter with bounded frame/ACK
   handling and reconnect/no-rearm fake-serial coverage
   ([issue](issues/open/20260908-espnow-host-transport.md)).
+- Hardened unsafe mission emergency-stop coverage, owner-thread control
+  shutdown/disarm, reordered flight-link ACK matching, and fail-closed
+  reconnect state reset.
 - Added a bounded decoded-frame adapter and FFmpeg/synthetic probe, plus a
   deterministic delayed/lossy flight-dynamics fixture for G1 evidence.
 - Added manifest verification for read-only SD artifacts and an explicit,

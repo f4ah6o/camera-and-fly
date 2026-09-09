@@ -1,7 +1,7 @@
 # P2-2: reconnect の open failure で stale local state を残さない
 
 Status: open
-Model: Luna Max
+Model: unknown
 Created: 2026-09-09
 Updated: 2026-09-09
 Kind: implementation
@@ -58,13 +58,13 @@ reconnect の open failure を上位が明確に disconnected/faulted と判定�
 
 ## 受け入れ条件
 
-- [ ] previously claimed の live connection に対する successful reconnect が新しい endpoint と fresh session を使い、new CLAIM 以外の旧 SET / ARM state を送らない。
-- [ ] previously claimed の live connection で `_open_serial()` が失敗した場合、`FlightLinkDisconnected` 相当の bounded error を返す。
-- [ ] open failure の直後に `claimed=False`、`has_setpoint=False`、`armed=False`、`requires_reconnect=True` が同時に成立する。
-- [ ] open failure の直後に旧 `session_id`、setpoint、last-set freshness を再利用しない。
-- [ ] failed reconnect の後、次の retry で open と fresh CLAIM が成功すれば利用可能になるが、旧 state は復元されない。
-- [ ] injected serial reconnect の既存 behavior、closed injected endpoint の要求、no-rearm regression が維持される。
-- [ ] failed open 後に closed / stale endpoint への通常 SET が発行されない。
+- [x] previously claimed の live connection に対する successful reconnect が新しい endpoint と fresh session を使い、new CLAIM 以外の旧 SET / ARM state を送らない。
+- [x] previously claimed の live connection で `_open_serial()` が失敗した場合、`FlightLinkDisconnected` 相当の bounded error を返す。
+- [x] open failure の直後に `claimed=False`、`has_setpoint=False`、`armed=False`、`requires_reconnect=True` が同時に成立する。
+- [x] open failure の直後に旧 `session_id`、setpoint、last-set freshness を再利用しない。
+- [x] failed reconnect の後、次の retry で open と fresh CLAIM が成功すれば利用可能になるが、旧 state は復元されない。
+- [x] injected serial reconnect の既存 behavior、closed injected endpoint の要求、no-rearm regression が維持される。
+- [x] failed open 後に closed / stale endpoint への通常 SET が発行されない。
 
 ## 必須tests
 
@@ -92,7 +92,14 @@ open failure の例外処理だけを追加して local state の reset を後�
 
 ## 変更履歴
 
-`CHANGES.md` impact: yes。再接続失敗時の health/status safety behavior が変わる可能性があるが、この issue 作成コミットでは `CHANGES.md` を変更しない。実装完了時に既存の変更履歴規約を確認する。
+`CHANGES.md` impact: yes。実装内容を `CHANGES.md` の Unreleased に記録した。
+
+## 実装記録（2026-09-09）
+
+- fail-closed 方式（B）を採用した。live serial の close 後に reopen が失敗した場合、session、claim、setpoint、freshness、decoder/ACK state を直ちに reset し、`requires_reconnect=True` の disconnected error を返す。
+- retry の open 成功後は旧 state を復元せず、新 endpoint へ fresh session の CLAIM だけを送る。injected endpoint と closed endpoint の既存契約も維持した。
+- `host/tests/test_flight_link.py` に successful live reconnect、open failure、failed retry、injected reconnect の fake serial coverage を追加した。
+- `.venv/bin/python -m unittest host.tests.test_flight_link -v`、`.venv/bin/python -m unittest discover -s host/tests -v`、`git diff --check` が PASS。実 serial・実 RF・hardware acceptance は実施していない。
 
 ## Luna Max 着手契約
 

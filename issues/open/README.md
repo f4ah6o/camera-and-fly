@@ -121,6 +121,10 @@ These files remain as contracts/history and should not be selected as implementa
 - [camera-stream-measurement](20260908-camera-stream-measurement.md)
 - [camera-stampfly-dry-run](20260908-camera-stampfly-dry-run.md)
 - [host-control-scheduler](20260908-host-control-scheduler.md)
+- [mission-emergency-stop-state-desync](20260909-mission-emergency-stop-state-desync.md) — unsafe IDLE/COMPLETE emergency-stop coverage
+- [control-loop-stop-disarm](20260909-control-loop-stop-disarm.md) — owner-thread bounded shutdown/disarm
+- [flight-link-reordered-ack](20260909-flight-link-reordered-ack.md) — reordered ACK matching and bounded seen state
+- [flight-link-reconnect-open-failure](20260909-flight-link-reconnect-open-failure.md) — fail-closed reconnect reset and fresh retry
 - [mission-supervisor](20260908-mission-supervisor.md)
 - [altitude-failsafe-design](20260908-altitude-failsafe-design.md)
 - [ssh-update-recovery-design](20260908-ssh-update-recovery-design.md)

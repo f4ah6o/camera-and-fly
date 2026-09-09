@@ -1,7 +1,7 @@
 # P2-1: reordered ACK で有効な matching ACK を捨てない
 
 Status: open
-Model: Luna Max
+Model: unknown
 Created: 2026-09-09
 Updated: 2026-09-09
 Kind: implementation
@@ -55,13 +55,13 @@ ACK の packet delivery 順序に左右されず target application ACK を正�
 
 ## 受け入れ条件
 
-- [ ] 無関係な新しい ACK packet #11 が先に届き、その後に target の低い ACK packet #10 が届く場合、target application ACK を valid として返す。
-- [ ] RF delivery ACK が application ACK より先、または逆順で届いても、application ACK の待ち受け結果と `last_delivery_ack` の意味が壊れない。
-- [ ] 同一 ACK の duplicate は成功を二重計上せず、後続 command の ACK として誤受理されない。
-- [ ] `acknowledged_sequence` が target と異なる ACK は、packet sequence が新しくても target の成功にしない。
-- [ ] foreign session の ACK は無視し、target application ACK として受理しない。
-- [ ] bounded pending / unmatched queue と seen/order state の上限を維持し、大量 ACK でメモリが無制限に増えない。
-- [ ] 既存の timeout、strict target matching、sequence exhaustion、disconnect の regression がない。
+- [x] 無関係な新しい ACK packet #11 が先に届き、その後に target の低い ACK packet #10 が届く場合、target application ACK を valid として返す。
+- [x] RF delivery ACK が application ACK より先、または逆順で届いても、application ACK の待ち受け結果と `last_delivery_ack` の意味が壊れない。
+- [x] 同一 ACK の duplicate は成功を二重計上せず、後続 command の ACK として誤受理されない。
+- [x] `acknowledged_sequence` が target と異なる ACK は、packet sequence が新しくても target の成功にしない。
+- [x] foreign session の ACK は無視し、target application ACK として受理しない。
+- [x] bounded pending / unmatched queue と seen/order state の上限を維持し、大量 ACK でメモリが無制限に増えない。
+- [x] 既存の timeout、strict target matching、sequence exhaustion、disconnect の regression がない。
 
 ## 必須tests
 
@@ -91,7 +91,14 @@ packet sequence の検証を緩めすぎると古い ACK や別 command の ACK 
 
 ## 変更履歴
 
-`CHANGES.md` impact: yes。正常 packet reorder で不要 timeout / fault を起こさない safety-visible な transport behavior の修正候補だが、この issue 作成コミットでは `CHANGES.md` を変更しない。実装完了時に既存の変更履歴規約を確認する。
+`CHANGES.md` impact: yes。実装内容を `CHANGES.md` の Unreleased に記録した。
+
+## 実装記録（2026-09-09）
+
+- `_wait_for_application_ack()` は ACK payload の target matching と packet sequence order を分離し、bounded seen/order state で duplicate だけを除外する。高い unrelated ACK の後の低い matching ACK を受理できる。
+- application ACK 完了後に既に buffered な ACK を bounded に drain し、RF-delivery ACK が application ACK の前後どちらでも `last_delivery_ack` に記録される。同じ command の完了 ACK は bounded completed-target state で再利用しない。
+- `host/tests/test_flight_link.py` に reorder、RF/application 両順序、duplicate、wrong target、foreign session、bounded state を追加した。
+- `.venv/bin/python -m unittest host.tests.test_flight_link -v`、`.venv/bin/python -m unittest discover -s host/tests -v`、`git diff --check` が PASS。実 RF・hardware acceptance は実施していない。
 
 ## Luna Max 着手契約
 

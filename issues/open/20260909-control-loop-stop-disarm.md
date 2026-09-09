@@ -1,7 +1,7 @@
 # P1-2: ControlLoop の正常停止で single-owner DISARM を明示する
 
 Status: open
-Model: Luna Max
+Model: unknown
 Created: 2026-09-09
 Updated: 2026-09-09
 Kind: implementation
@@ -57,13 +57,13 @@ stop 要求は worker に伝達し、transport owner が通常 tick を止めて
 
 ## 受け入れ条件
 
-- [ ] non-zero `SET` を送った後に normal stop すると、fake transport の DISARM 呼び出しが exactly once になり、その後の scheduler state が `STOPPED` になる。
-- [ ] DISARM の試行（成功・best-effort exception のいずれでも）が完了する前に `STOPPED` を公開しない。
-- [ ] stop を繰り返しても DISARM、`SET`、その他の transport action が追加発行されず、idempotent である。
-- [ ] fault path が先に DISARM した場合、後続の normal stop が double-disarm にならない。
-- [ ] `stop(timeout=...)` が live worker の join timeout で bounded に戻り、worker 生存中に完全停止済みと判定できる `STOPPED` を先取りしない。
-- [ ] live worker が終了した後は、stop 完了時に DISARM が exactly once であり、最終 state が `STOPPED` になる。
-- [ ] stop 要求と tick の境界で non-zero `SET` が DISARM 後に送信されない。
+- [x] non-zero `SET` を送った後に normal stop すると、fake transport の DISARM 呼び出しが exactly once になり、その後の scheduler state が `STOPPED` になる。
+- [x] DISARM の試行（成功・best-effort exception のいずれでも）が完了する前に `STOPPED` を公開しない。
+- [x] stop を繰り返しても DISARM、`SET`、その他の transport action が追加発行されず、idempotent である。
+- [x] fault path が先に DISARM した場合、後続の normal stop が double-disarm にならない。
+- [x] `stop(timeout=...)` が live worker の join timeout で bounded に戻り、worker 生存中に完全停止済みと判定できる `STOPPED` を先取りしない。
+- [x] live worker が終了した後は、stop 完了時に DISARM が exactly once であり、最終 state が `STOPPED` になる。
+- [x] stop 要求と tick の境界で non-zero `SET` が DISARM 後に送信されない。
 
 ## 必須tests
 
@@ -90,7 +90,14 @@ shutdown を外側 thread から直接 transport に送ると single-owner invar
 
 ## 変更履歴
 
-`CHANGES.md` impact: yes。正常停止時の safety behavior が変わる可能性があるが、この issue 作成コミットでは `CHANGES.md` を変更しない。実装完了時に既存の変更履歴規約を確認する。
+`CHANGES.md` impact: yes。実装内容を `CHANGES.md` の Unreleased に記録した。
+
+## 実装記録（2026-09-09）
+
+- `ControlScheduler` は normal stop と fault stop で共通の one-shot DISARM guard を使い、DISARM の戻り（処理済み exception を含む）後にだけ `STOPPED` を公開する。`request_stop()` は I/O を行わず、`ControlLoop` の owner worker が shutdown を finalise する。
+- `ControlLoop.stop(timeout=...)` は完了時に `True`、worker が timeout 時点で生存中なら `False` を返す。timeout caller は STOPPED / DISARM を先取りせず、stop 境界で新しい SET を許さない。
+- `host/tests/test_control_loop.py` に normal/repeated/fault stop、DISARM exception、owner thread、join timeout の deterministic fake tests を追加した。
+- `.venv/bin/python -m unittest host.tests.test_control_loop -v`、`.venv/bin/python -m unittest discover -s host/tests -v`、`git diff --check` が PASS。実機・hardware acceptance は実施していない。
 
 ## Luna Max 着手契約
 

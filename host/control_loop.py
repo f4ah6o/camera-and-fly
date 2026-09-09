@@ -143,6 +143,7 @@ class ControlScheduler:
         self._last_sent_at: float | None = None
         self._last_intent_sequence: int | None = None
         self._disarm_sent = False
+        self._stop_requested = threading.Event()
 
     @property
     def state(self) -> SchedulerState:
@@ -159,9 +160,13 @@ class ControlScheduler:
     def publish(self, intent: ControlIntent) -> None:
         if self._state is SchedulerState.FAULT:
             raise RuntimeError("control scheduler is fault-latched")
+        if self._stop_requested.is_set() or self._state is SchedulerState.STOPPED:
+            raise RuntimeError("control scheduler is stopping")
         self.mailbox.publish(intent)
 
     def fault(self, reason: str) -> SchedulerTick:
+        if self._state is SchedulerState.STOPPED:
+            return SchedulerTick(SchedulerState.STOPPED, False)
         self._latch_fault(reason)
         return SchedulerTick(SchedulerState.FAULT, False, fault_reason=reason)
 
@@ -173,6 +178,11 @@ class ControlScheduler:
             return SchedulerTick(SchedulerState.FAULT, False, fault_reason=self._fault_reason)
         if self._state is SchedulerState.STOPPED:
             return SchedulerTick(SchedulerState.STOPPED, False)
+        if self._stop_requested.is_set():
+            # The owner will perform the final DISARM and publish STOPPED.
+            # Keeping READY visible here prevents a stop caller from
+            # mistaking a request for a completed shutdown.
+            return SchedulerTick(SchedulerState.READY, False)
 
         intent = self.mailbox.latest()
         if intent is None:
@@ -202,20 +212,49 @@ class ControlScheduler:
         self._last_intent_sequence = intent.sequence
         return SchedulerTick(SchedulerState.READY, True, wire_sequence)
 
+    @property
+    def stop_requested(self) -> bool:
+        return self._stop_requested.is_set()
+
+    def request_stop(self) -> None:
+        """Request owner-thread shutdown without performing transport I/O."""
+
+        self._stop_requested.set()
+
     def stop(self) -> None:
+        """Finalize shutdown from the transport-owning thread.
+
+        The caller must be the thread that owns ``transport``.  The
+        ``ControlLoop`` enforces this by waiting for its worker to finish
+        before a fallback caller finalizes an already-ended worker.
+        """
+
+        self._stop_requested.set()
+        if self._state is SchedulerState.STOPPED:
+            return
+        self.mailbox.clear()
+        self._send_disarm_once()
+        # Do not publish STOPPED until the best-effort DISARM attempt has
+        # returned, including its handled exception path.
         self._state = SchedulerState.STOPPED
 
     def _latch_fault(self, reason: str) -> None:
-        if self._state is SchedulerState.FAULT:
+        if self._state in {SchedulerState.FAULT, SchedulerState.STOPPED}:
             return
         self._state = SchedulerState.FAULT
         self._fault_reason = reason
         self.mailbox.clear()
+        self._send_disarm_once()
+
+    def _send_disarm_once(self) -> None:
         if not self._disarm_sent:
             self._disarm_sent = True
             try:
                 self.transport.best_effort_disarm()
-            except (OSError, StampFlyError, RuntimeError):
+            except Exception:
+                # DISARM is deliberately best effort.  The one-shot guard
+                # remains consumed even when a transport implementation
+                # raises an unexpected ordinary exception.
                 pass
 
 
@@ -244,26 +283,47 @@ class ControlLoop:
         self._thread = threading.Thread(target=self._run, name="stampfly-control-owner", daemon=True)
         self._thread.start()
 
-    def stop(self, *, timeout: float | None = None) -> None:
+    def stop(self, *, timeout: float | None = None) -> bool:
+        if timeout is not None and (
+            not isinstance(timeout, (int, float))
+            or isinstance(timeout, bool)
+            or not math.isfinite(timeout)
+            or timeout < 0
+        ):
+            raise ValueError("timeout must be finite and non-negative or None")
+        self.scheduler.request_stop()
         self._stop.set()
         thread = self._thread
         if thread is not None:
             thread.join(timeout)
+            if thread.is_alive():
+                # The worker still owns the transport.  Do not publish
+                # STOPPED or issue a competing DISARM from this caller.
+                return False
         self.scheduler.stop()
+        return self.scheduler.state is SchedulerState.STOPPED
 
     def _run(self) -> None:
         next_tick = time.monotonic()
-        while not self._stop.is_set() and self.scheduler.state is SchedulerState.READY:
-            now = time.monotonic()
-            if now < next_tick:
-                self._stop.wait(next_tick - now)
-                continue
-            result = self.scheduler.tick(now=now)
-            if self.on_tick is not None:
-                self.on_tick(result)
-            next_tick += self.period
-            if next_tick < time.monotonic() - self.period:
-                next_tick = time.monotonic()
+        try:
+            while (
+                not self._stop.is_set()
+                and not self.scheduler.stop_requested
+                and self.scheduler.state is SchedulerState.READY
+            ):
+                now = time.monotonic()
+                if now < next_tick:
+                    self._stop.wait(next_tick - now)
+                    continue
+                result = self.scheduler.tick(now=now)
+                if self.on_tick is not None:
+                    self.on_tick(result)
+                next_tick += self.period
+                if next_tick < time.monotonic() - self.period:
+                    next_tick = time.monotonic()
+        finally:
+            if self._stop.is_set() or self.scheduler.stop_requested:
+                self.scheduler.stop()
 
 
 __all__ = [

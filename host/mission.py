@@ -208,10 +208,11 @@ def step(
     if not isinstance(operator_event, OperatorEvent):
         operator_event = OperatorEvent(operator_event)
 
-    if operator_event is OperatorEvent.EMERGENCY_STOP and context.state not in {
-        MissionState.IDLE,
-        MissionState.COMPLETE,
-    }:
+    if operator_event is OperatorEvent.EMERGENCY_STOP and (
+        context.state not in {MissionState.IDLE, MissionState.COMPLETE}
+        or health.armed
+        or not health.grounded
+    ):
         faulted = _enter(context, MissionState.FAULT, now_monotonic, reason="operator_emergency_stop")
         updated, action = _action(faulted, ActionKind.EMERGENCY_STOP, reason="operator_emergency_stop")
         return MissionTransition(updated, action)
