@@ -224,6 +224,66 @@ argument is a path to a `.scn` file, not a bare scenario name.
 `list` is the default action. Missing `sf`, non-zero exits, and timeouts are
 explicit fail-closed errors.
 
+### Simulation-only SILS interactive closed loop (Milestone A)
+
+Beyond the one-way `sf sim headless` batch above, `host/stampfly_sils.py`
+connects to the installed SILS emulator process seam. The upstream CLI
+entrypoint `sf sils fly` is **not itself pipe-friendly**: upstream
+`lib/sfcli/commands/sils.py::run_fly()` checks `sys.stdin.isatty()` and exits
+with an error otherwise, because its stdin is raw keyboard input. That entrypoint
+is only the evidence for *how* upstream launches the emulator. The actual pipe
+seam is the process it launches on macOS/non-Windows: the built
+`<root>/simulator/sils/build/emu_vehicle` with argv
+`[emu_vehicle, <root>/simulator/sils/models/stampfly.xml, <duration_us>]`
+(`argv` array, `shell=False`) and env `SILS_EMU_REALTIME=1` /
+`SILS_EMU_RC_STDIN=1`. This module resolves that root (explicit
+`--root`/`--ecosystem-root`, then `STAMPFLY_ECOSYSTEM_ROOT`, then the narrow
+`~/src/stampfly_ecosystem` default), verifies the built executable and model
+exist, and verifies the read-only source seam markers (`SILS_EMU_RC_STDIN`, the
+`rc` line format, the unique `STATE t=` format) before launching. Missing or
+incompatible artifacts fail closed with `SilsUnsupportedBuild`; the protocol is
+never guessed.
+
+It writes line-oriented `rc <roll> <pitch> <yaw> <throttle>` sticks (ADC
+0..4095, center 2048) and reads structured `STATE t=... alt=... roll=... pitch=
+... yaw=... mode=... vbatt=...` telemetry. Upstream emits attitude in degrees
+despite the field names; the transport converts to radians at the parse
+boundary. The implementation is shaped as a host -> emu -> firmware/plant ->
+telemetry -> next-command loop rather than a batch run. Deterministic fake tests
+exercise command-driven state changes and feedback, but the installed
+`emu_vehicle` artifact is currently absent, so the real upstream loop has not
+yet been demonstrated live.
+
+It never opens serial/USB, never selects a port, never arms, and only sends
+bounded centered/near-centered stick frames; `start()` sends the non-arming safe
+center frame `rc 2048 2048 2048 2048` first and throttle `0.0` maps to that same
+ADC center. Telemetry is validated fail-closed (strict schema/finite checks,
+strictly increasing upstream `t`, host receive timestamp/staleness), and process
+exit, broken stdin, malformed, missing, or stale telemetry latch a fault that
+blocks further commands. `close()` sends only `quit` and then bounds the wait
+and terminates/kills its own child; there is no auto-reconnect. Each result stays
+`provider=stampfly_ecosystem`, `evidence_kind=simulation`, `simulation=true`,
+`flight_qualified=false`. `host/flight_sim.py` remains the deterministic
+dependency-free simulator, and `host/stampfly_sim.py` remains the optional
+one-way batch evidence adapter (it is not interactive).
+
+**Live smoke status: BLOCKED / NOT RUN.** In the checked environment the
+installed artifact `<root>/simulator/sils/build/emu_vehicle` does not exist (the
+model `simulator/sils/models/stampfly.xml` does), and the external repository is
+read-only so it is not built here. This module fails closed for that case;
+Milestone A live verification is **not claimed** until the emulator exists.
+
+~~~sh
+# read-only resolution by default
+.venv/bin/python -m host.stampfly_sils --root /path/to/stampfly_ecosystem resolve
+# bounded, non-arming interactive smoke (simulation only)
+.venv/bin/python -m host.stampfly_sils --root /path/to/stampfly_ecosystem smoke --iterations 4 --json
+~~~
+
+This milestone makes no camera/perception closed-loop claim: SILS telemetry is
+never routed into `host/vision.py`, and Milestone B is not claimed. See
+`issues/open/20260914-stampfly-sils-true-closed-loop.md`.
+
 ## SD runtime deployment
 
 `host/camera_deploy.py` supports explicit `inspect`, `stage`, `activate`,
