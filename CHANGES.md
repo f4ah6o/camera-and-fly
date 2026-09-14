@@ -59,5 +59,19 @@
   `provider=stampfly_ecosystem`, `evidence_kind=simulation`, `simulation=true`,
   `flight_qualified=false`. Milestone A live smoke is PASS. The non-arming run
   stayed PREFLIGHT with centered throttle, so no physical attitude change was
-  observed or claimed. Milestone B is not claimed
+  observed or claimed. Milestone A remains independently scoped
   ([issue](issues/open/20260914-stampfly-sils-true-closed-loop.md)).
+- Added the simulation-only SILS camera/perception Milestone B vertical slice
+  (`host/sim_camera_perception.py`): fresh real SILS `STATE` is rendered into
+  deterministic grayscale pixel frames, image-moment perception emits the
+  production `PoseObservation` contract, the existing vision gate feeds a
+  bounded/expiring simulation-only outer controller, and existing
+  `ControlScheduler` / `SilsControlAdapter` send zero-throttle commands to the
+  installed `emu_vehicle` before reading the next fresh `STATE`. The bounded
+  live smoke measured `S0 -> F0 -> P0 -> C0 -> fresh S1 -> F1 -> P1 -> C1`
+  with simulator time `0.000 -> 0.132 s`, receive sequence `1 -> 5`, four
+  distinct frame fingerprints, and zero faults. Evidence is written as bounded
+  JSON/JSONL with simulator/frame/perception/command linkage and simulation-only
+  provenance. The run stayed non-arming PREFLIGHT and showed no physical
+  attitude response; real Atom Cam/calibration/flight qualification are not
+  claimed ([issue](issues/open/20260915-stampfly-sils-camera-perception-closed-loop.md)).

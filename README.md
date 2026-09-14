@@ -286,9 +286,46 @@ physical attitude change is claimed. Provenance remains simulation-only and
 .venv/bin/python -m host.stampfly_sils --root /path/to/stampfly_ecosystem --json smoke --iterations 4
 ~~~
 
-This milestone makes no camera/perception closed-loop claim: SILS telemetry is
-never routed into `host/vision.py`, and Milestone B is not claimed. See
-`issues/open/20260914-stampfly-sils-true-closed-loop.md`.
+Milestone A itself still makes no camera/perception claim; that boundary is
+kept intact in `issues/open/20260914-stampfly-sils-true-closed-loop.md`.
+
+### Simulation-only camera/perception closed loop (Milestone B)
+
+`host/sim_camera_perception.py` adds a separate simulation-only vertical slice
+without changing the Milestone A transport. Each fresh SILS `STATE` is rendered
+into deterministic grayscale pixel bytes (`DecodedFrame`), a simulation-only
+image-moment detector measures those pixels into the existing
+`host.vision.PoseObservation` contract, the existing vision gate validates
+freshness/quality, and a bounded simulation-only outer controller emits an
+expiring existing `ControlIntent`. The existing `ControlScheduler` and
+`SilsControlAdapter` then send a zero-throttle bounded RC command to the real
+installed `emu_vehicle`; the command is followed by a fresh `STATE`, which is
+the sole source for the next rendered frame. Raw SILS state is never passed to
+the controller as pose and no `PoseObservation` is injected as ground truth.
+
+**Live smoke status: PASS (Milestone B, simulation-only).** On 2026-09-15 a
+4-iteration run against the installed `emu_vehicle` measured the causal chain
+`S0(t=0.000, receive=1) -> F0(frame=1) -> P0(perception=1) -> C0(wire=1) ->
+S1(t=0.033, receive=2) -> F1(frame=2) -> P1(perception=2) -> C1(wire=2)` and
+continued through simulator time `0.132 s` / receive sequence `5`, with zero
+process/scheduler/telemetry faults. Per-frame SHA-256 fingerprints differed and
+the JSONL evidence records each frame's source simulator time, perception/pose,
+intent lifetime, wire sequence, next STATE, and next-frame linkage. The first
+transport command remains the non-arming safe center `rc 2048 2048 2048 2048`.
+The run stayed PREFLIGHT and did **not** show physical attitude motion, so no
+motor/plant-response claim is made. This is not real Atom Cam qualification,
+real-camera calibration accuracy, or flight qualification; those prerequisite
+issues remain open.
+
+~~~sh
+.venv/bin/python -m host.sim_camera_perception \
+  --root /path/to/stampfly_ecosystem \
+  --json \
+  --jsonl artifacts/stampfly-sils-camera-perception-smoke.jsonl \
+  camera-smoke --iterations 4
+~~~
+
+See `issues/open/20260915-stampfly-sils-camera-perception-closed-loop.md`.
 
 ## SD runtime deployment
 

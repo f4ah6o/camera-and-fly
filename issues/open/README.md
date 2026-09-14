@@ -1,6 +1,6 @@
 # Open issues — Luna Max execution index
 
-Updated: 2026-09-14
+Updated: 2026-09-15
 
 このディレクトリの issue は **1 issue = 1 Luna Max 実装/検証セッション** を原則とする。親 coordinator から直接実装を始めず、`Luna-Ready` と依存を確認して子 issue を1件だけ選ぶ。
 
@@ -23,6 +23,11 @@ Updated: 2026-09-14
 | [ssh-runtime-deploy-fault-injection](20260908-ssh-runtime-deploy-fault-injection.md) | deploy interruption/concurrency/idempotency fixtures |
 | [stampfly-ecosystem-simulation-sils](20260914-stampfly-ecosystem-simulation-sils.md) | fail-closed optional `sf sim`/`sf sils` backend + provenance |
 | [stampfly-sils-true-closed-loop](20260914-stampfly-sils-true-closed-loop.md) | simulation-only interactive SILS transport over the direct `emu_vehicle` seam + host closed loop; real installed `emu_vehicle` smoke verified PASS for Milestone A, Milestone B remains out of scope |
+| [stampfly-sils-camera-perception-closed-loop](20260915-stampfly-sils-camera-perception-closed-loop.md) | Milestone B PASS (simulation-only): real installed `emu_vehicle` STATE → deterministic pixel frame → `PoseObservation` → bounded controller/scheduler → fresh STATE → next frame/decision; real Atom Cam/calibration/flight qualification remain separate open work |
+
+Blocked / partial (do not select as a ready task):
+
+- Real camera detector/calibration/live qualification and hardware safe-qualification remain blocked on their own prerequisite issues; the simulation-only Milestone B PASS above does not complete them.
 
 ## Ready only with explicitly verified hardware
 
