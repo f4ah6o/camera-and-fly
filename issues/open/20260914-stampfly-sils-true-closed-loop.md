@@ -3,14 +3,14 @@
 Status: open
 Model: deepseek-v4.1-flash
 Created: 2026-09-14
-Updated: 2026-09-14
+Updated: 2026-09-15
 Kind: implementation
 Luna-Ready: yes
 Branch: main
 
 ## Luna Max 着手契約
 
-この issue は simulation-only。`host/stampfly_sim.py`（既存の片方向 batch wrapper）と `host/flight_sim.py`（既存の決定論的 plant）は挙動変更しない。新規の simulation-only interactive transport とその fake tests、必要な index/README/CHANGES のみを触る。実機 serial/USB/ARM/takeoff/motor は一切扱わない。外部 `/Users/fu2hito/src/stampfly_ecosystem` は読み取り専用で、変更しない。upstream 変更が必要になった場合は着手を止め、cross-repo interface をこの issue に追記する。
+この issue は simulation-only。`host/stampfly_sim.py`（既存の片方向 batch wrapper）と `host/flight_sim.py`（既存の決定論的 plant）は挙動変更しない。新規の simulation-only interactive transport とその fake tests、必要な index/README/CHANGES のみを触る。実機 serial/USB/ARM/takeoff/motor は一切扱わない。外部 `/Users/fu2hito/src/stampfly_ecosystem` は通常 read-only とし、2026-09-15 の real verification では official `sf sils build --target vehicle` が生成する `simulator/sils/build/` 以下の build artifact だけを許可した。tracked upstream source は変更しない。
 
 ## 概要
 
@@ -27,9 +27,11 @@ Branch: main
 - `lib/sfcli/commands/sils.py::run_fly()`: `sys.stdin.isatty()` を検査し、非対話 terminal では exit 1 + `[ERROR] `sf sils fly` requires an interactive terminal` で失敗する。stdin は raw keyboard input であり pipe ではない。よって `sf sils fly` 自身はこの transport の pipe seam ではない。**upstream がどのように emu を起動するかの evidence** ではある。
 - `lib/sfcli/commands/sils.py::run_fly()` が起動する実 process seam（非 Windows）: `bd=_build_dir()` = `<root>/simulator/sils/build`、`exe=bd/'emu_vehicle'`、model=`<root>/simulator/sils/models/stampfly.xml`、env=`os.environ` + `SILS_EMU_REALTIME=1` + `SILS_EMU_RC_STDIN=1`、argv=`[str(exe), str(model), str(int(duration * 1e6))]`。
 - `simulator/sils/devices/rc_stdin.cpp`: stdin は行指向で `rc <roll> <pitch> <yaw> <throttle>`、`arm`、`land`/`disarm`、`quit` を受け付ける。ADC 入力は 0..4095 に clamp、center 2048。`_fly_adc(0)` は throttle を含む全4軸を neutral（ADC ~2048）へ写し、rc_stdin 初期 `g_thr` は `kAdcCentre`。
+- `simulator/sils/devices/rc_stdin.cpp` は保持した stick 値を 50 Hz で `sils::inject_rc()` へ渡し、`scenario_inject.cpp::inject_rc()` は実 firmware と同じ宛先形式の 14-byte ControlPacket を作って host ESP-NOW seam (`sils_espnow_deliver`) へ注入する。
+- `simulator/sils/CMakeLists.txt` の `emu_vehicle` target は `${EMU_VEHICLE_SRCS}`（vehicle firmware sources）、`virtual_board.cpp`、`scenario_inject.cpp`、`rc_stdin.cpp`、`plant/plant.cpp` を同一 executable にリンクする。
 - `simulator/sils/emu/emu_main.cpp`: realtime モードは ~30 Hz で次を出力する。
   `STATE t=%.3f alt=%.3f roll=%.2f pitch=%.2f yaw=%.2f mode=%s:%s%s vbatt=%.2f`
-  `t` は virtual scheduler time（秒）で、authoritative な monotonic simulator timestamp。STATE 値は real firmware が publish する estimate/system_mode/power topic 由来。`on_advance` は RC processing/HUD の前に plant physics を step する。`roll/pitch/yaw` は名前に単位が無いが **degrees**（`e.* * kRad2Deg`）で出力される。
+  `t` は virtual scheduler time（秒）で、authoritative な monotonic simulator timestamp。STATE 値は real firmware が publish する estimate/system_mode/power topic 由来。`on_advance` は `sils_board_step_plant(dt)` で plant physics を進めた後に RC stdin tick / STATE 出力を行う。`roll/pitch/yaw` は名前に単位が無いが **degrees**（`e.* * kRad2Deg`）で出力される。
 - `lib/sfcli/commands/sils.py`: `_fly_parse_state()` がこの `STATE` channel を、`_fly_stdout_reader()` が log 出力と分離して parse する。ここが実 interactive seam。
 - HUD には upstream の explicit sequence field が無い。upstream が供給していない sequence を捏造しない。local receive sequence は transport metadata としてのみ保持し、upstream `t` の strict monotonicity と host receive time/staleness を別途検証する。
 
@@ -87,7 +89,8 @@ upstream の reconnect/restart semantics をこの環境で検証できないた
 - [x] missing/malformed/stale telemetry → safe fault/stop。
 - [x] subprocess loss/broken pipe/timeout → safe fault/stop。
 - [x] deterministic fake tests（parser degrees->radians、command serialization/range、monotonic t regression、duplicate/non-advancing、stale/missing、malformed、process exit、broken pipe、timeout、close、provenance）。
-- [ ] real SILS integration smoke: **BLOCKED / NOT RUN**。installed artifact `<root>/simulator/sils/build/emu_vehicle` が存在しない（model は存在）。外部 repo は read-only のため build しない。live PASS は主張しない。
+- [x] real SILS integration smoke: **PASS**。installed `/Users/fu2hito/src/stampfly_ecosystem/simulator/sils/build/emu_vehicle` を使用し、4 iterations で `STATE` receive sequence 1→5、sim time 0.000→0.132 s、bounded roll ADC 2559 を各 iteration で送信、各送信後の fresh STATE から次 decision を再計算した。fault 0。
+- [x] real SILS bounded extension: **PASS**。同じ non-arming 条件で20 iterations、receive sequence 1→21、sim time 0.000→0.660 s、command count 21、fault 0。roll/pitch/altitude の物理変化は観測されず、姿勢変化を PASS 根拠としては主張しない。
 - [x] Milestone B（camera/perception 閉ループ）を主張しない。
 - [x] `host/flight_sim.py` intact。
 - [x] telemetry-validity 関連の既存ロジックを弱めない。
@@ -113,10 +116,10 @@ upstream の reconnect/restart semantics をこの環境で検証できないた
 - `SilsControlAdapter` が throttle 0 以外と過大 stick を拒否し、normalized→ADC 変換。
 - `SilsClosedLoopDriver` が 2 iteration 以上で、iteration 2 の command が iteration 1 後の STATE から計算されることを示す。
 
-実 SILS smoke（現状 BLOCKED）:
+実 SILS smoke:
 
 ```
-.venv/bin/python -m host.stampfly_sils --root /path/to/stampfly_ecosystem smoke --iterations 4
+.venv/bin/python -m host.stampfly_sils --root /Users/fu2hito/src/stampfly_ecosystem --json smoke --iterations 4
 ```
 
 既存 suite:
@@ -130,18 +133,24 @@ git status --short --branch
 
 ## 証拠・実行記録
 
-2026-09-14 の post-agent verification で以下を実行した。
+2026-09-14〜15 の verification で以下を実行した。
 
 - [x] `.venv/bin/python -m unittest host.tests.test_stampfly_sils -v`: **PASS 55/55**。
 - [x] `.venv/bin/python -m unittest host.tests.test_stampfly_sim -v`: **PASS 33/33**。
 - [x] host suite excluding AtomCam localhost fixture: **PASS 168/168**（15 modules）。
 - [ ] `host.tests.test_atomcam`: テスト本体は開始前に fixture bind が `PermissionError: [Errno 1] Operation not permitted` で失敗。StampFly simulation regression として扱わない。
 - [x] `git diff --check`: **PASS**。
-- [x] installed source marker verification against `/Users/fu2hito/src/stampfly_ecosystem`: **PASS**。root/model は確認でき、`emu_vehicle` artifact は missing。
+- [x] official build path確認: installed `sf sils build --help` と `lib/sfcli/commands/sils.py::run_build()` を読み、`sf sils build --target vehicle` → `emu_vehicle` が official CMake host-SILS build で、macOS では flash/hardware/toolchain-install path を通らないことを確認。
+- [x] human-run build: `source setup_env.sh && sf sils build --target vehicle`: **PASS**。`simulator/sils/build/emu_vehicle` exists + executable、model exists。
+- [x] installed source marker verification against `/Users/fu2hito/src/stampfly_ecosystem`: **PASS**。direct emu argv、model path、`SILS_EMU_REALTIME=1`、`SILS_EMU_RC_STDIN=1`、RC stdin format、STATE format が current installed source と一致。
 - [x] external `/Users/fu2hito/src/stampfly_ecosystem` `git status --short --branch`: `## main...origin/main`（変更なし）。
-- [ ] real SILS smoke: **BLOCKED / NOT RUN**。installed `<root>/simulator/sils/build/emu_vehicle` artifact が存在しない。外部 repo は read-only 制約のため build しない。
+- [x] `resolve`: **PASS** (`found=true`, `emu_executable=true`, `model_exists=true`, reason=`artifacts_present`)。
+- [x] real SILS smoke 4 iterations: **PASS**。first transport command は実装契約どおり `rc 2048 2048 2048 2048`、その後 bounded roll command `rc 2559 2048 2048 2048`。real STATE は `t=0.000, 0.033, 0.066, 0.099, 0.132` と strict に進み、local receive sequence 1→5。各 command 後の fresh STATE を使って次の `roll_error=0.0500` decision を再計算。process/telemetry/scheduler fault なし。
+- [x] real SILS smoke 20 iterations: **PASS**。sim time 0.000→0.660 s、receive sequence 1→21、command count 21、fault 0。全 iteration で `mission_state=PREFLIGHT`, `health_telemetry_valid=true`。roll は 0.0 rad のままで `attitude_changed=false`。ARM していないため、roll command による物理姿勢変化は観測されなかった事実をそのまま記録する。
+- [x] source-level end-to-end seam再確認: RC line → `sils::inject_rc()` → ESP-NOW ControlPacket → linked vehicle firmware → virtual board/MuJoCo plant step → firmware estimate/system-mode/power topics → `STATE`。これと live fresh STATE/next-decision 証拠により Milestone A の real vehicle/control loop を確認。
+- [x] provenance: `provider=stampfly_ecosystem`, `evidence_kind=simulation`, `simulation=true`, `flight_qualified=false`; ARM/land/disarm/serial/USB/hardware path 未使用。
 
-deterministic fake は command に応じて state を更新し、その新しい STATE を次 command 計算へ使うため、transport/control feedback の因果を unit level で検証する。ただしこれは installed StampFly SILS 自体の live evidence ではない。`emu_vehicle` が利用可能になるまで Milestone A の real upstream closed-loop verification は主張しない。
+deterministic fake の feedback 検証に加え、installed `emu_vehicle` の live process でも command → real firmware/plant scheduler → fresh STATE → host mission/control → next command の一巡以上を確認したため、**Milestone A は COMPLETE / PASS** とする。non-arming PREFLIGHT のままなので姿勢変化そのものは観測されておらず、そこを追加の plant-response evidence としては主張しない。Milestone B（camera/perception closed loop）は未達のまま。
 
 ## 対象外
 

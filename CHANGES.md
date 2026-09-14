@@ -36,8 +36,12 @@
   <root>/simulator/sils/models/stampfly.xml, <duration_us>]`, `shell=False`,
   `SILS_EMU_REALTIME=1`/`SILS_EMU_RC_STDIN=1`) with a command ->
   plant/firmware -> telemetry -> next-command interface. Deterministic fake
-  tests exercise that feedback path; the real upstream loop is not yet claimed
-  live. The upstream `sf sils fly` entrypoint
+  tests exercise that feedback path. On 2026-09-15 the official
+  `sf sils build --target vehicle` artifact was also verified live: a bounded
+  4-iteration run advanced simulator time from 0.000 to 0.132 s and local
+  receive sequence from 1 to 5, with fresh STATE after each bounded roll
+  command feeding the next host decision; an extended 20-iteration run reached
+  0.660 s / receive sequence 21 with zero faults. The upstream `sf sils fly` entrypoint
   refuses a non-TTY stdin and is only the evidence for how upstream launches the
   emulator, not itself the pipe seam. An explicit `--root`/`STAMPFLY_ECOSYSTEM_ROOT`
   or narrow `~/src/stampfly_ecosystem` resolver verifies the built executable,
@@ -53,7 +57,7 @@
   `mission.HealthSnapshot` and scheduled with the existing `control_loop`
   structures; it never opens serial/USB, never arms, and every record remains
   `provider=stampfly_ecosystem`, `evidence_kind=simulation`, `simulation=true`,
-  `flight_qualified=false`. Live smoke is BLOCKED / NOT RUN because the
-  installed `simulator/sils/build/emu_vehicle` artifact is absent; no live PASS
-  is claimed and Milestone B is not claimed
+  `flight_qualified=false`. Milestone A live smoke is PASS. The non-arming run
+  stayed PREFLIGHT with centered throttle, so no physical attitude change was
+  observed or claimed. Milestone B is not claimed
   ([issue](issues/open/20260914-stampfly-sils-true-closed-loop.md)).

@@ -250,9 +250,9 @@ It writes line-oriented `rc <roll> <pitch> <yaw> <throttle>` sticks (ADC
 despite the field names; the transport converts to radians at the parse
 boundary. The implementation is shaped as a host -> emu -> firmware/plant ->
 telemetry -> next-command loop rather than a batch run. Deterministic fake tests
-exercise command-driven state changes and feedback, but the installed
-`emu_vehicle` artifact is currently absent, so the real upstream loop has not
-yet been demonstrated live.
+exercise command-driven state changes and feedback, and the installed
+`emu_vehicle` loop was verified live on 2026-09-15 after an official
+`sf sils build --target vehicle` build.
 
 It never opens serial/USB, never selects a port, never arms, and only sends
 bounded centered/near-centered stick frames; `start()` sends the non-arming safe
@@ -267,17 +267,23 @@ and terminates/kills its own child; there is no auto-reconnect. Each result stay
 dependency-free simulator, and `host/stampfly_sim.py` remains the optional
 one-way batch evidence adapter (it is not interactive).
 
-**Live smoke status: BLOCKED / NOT RUN.** In the checked environment the
-installed artifact `<root>/simulator/sils/build/emu_vehicle` does not exist (the
-model `simulator/sils/models/stampfly.xml` does), and the external repository is
-read-only so it is not built here. This module fails closed for that case;
-Milestone A live verification is **not claimed** until the emulator exists.
+**Live smoke status: PASS (Milestone A).** Against the installed
+`/Users/fu2hito/src/stampfly_ecosystem/simulator/sils/build/emu_vehicle`, a
+4-iteration bounded smoke received real STATE telemetry with strict simulator
+time progression `0.000 -> 0.132 s` and local receive sequence `1 -> 5`. After
+the initial non-arming safe center command, each iteration sent bounded roll ADC
+2559 and received a fresh STATE before recalculating the next decision. A
+20-iteration extension reached `0.660 s`, receive sequence `21`, command count
+21, and zero process/telemetry faults. Because the run intentionally remained
+disarmed/PREFLIGHT with centered throttle, roll telemetry stayed at zero and no
+physical attitude change is claimed. Provenance remains simulation-only and
+`flight_qualified=false`.
 
 ~~~sh
 # read-only resolution by default
 .venv/bin/python -m host.stampfly_sils --root /path/to/stampfly_ecosystem resolve
 # bounded, non-arming interactive smoke (simulation only)
-.venv/bin/python -m host.stampfly_sils --root /path/to/stampfly_ecosystem smoke --iterations 4 --json
+.venv/bin/python -m host.stampfly_sils --root /path/to/stampfly_ecosystem --json smoke --iterations 4
 ~~~
 
 This milestone makes no camera/perception closed-loop claim: SILS telemetry is

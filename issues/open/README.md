@@ -22,7 +22,7 @@ Updated: 2026-09-14
 | [sd-build-failure-hardening](20260908-sd-build-failure-hardening.md) | build failure/signal/concurrency fake tests |
 | [ssh-runtime-deploy-fault-injection](20260908-ssh-runtime-deploy-fault-injection.md) | deploy interruption/concurrency/idempotency fixtures |
 | [stampfly-ecosystem-simulation-sils](20260914-stampfly-ecosystem-simulation-sils.md) | fail-closed optional `sf sim`/`sf sils` backend + provenance |
-| [stampfly-sils-true-closed-loop](20260914-stampfly-sils-true-closed-loop.md) | simulation-only interactive SILS transport over the direct `emu_vehicle` seam + host closed loop (Milestone A); live smoke BLOCKED, still pending |
+| [stampfly-sils-true-closed-loop](20260914-stampfly-sils-true-closed-loop.md) | simulation-only interactive SILS transport over the direct `emu_vehicle` seam + host closed loop; real installed `emu_vehicle` smoke verified PASS for Milestone A, Milestone B remains out of scope |
 
 ## Ready only with explicitly verified hardware
 
