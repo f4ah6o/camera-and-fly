@@ -24,3 +24,9 @@
 - Added manifest verification for read-only SD artifacts and an explicit,
   reversible versioned runtime deployment CLI for the SD filesystem, with
   failure-injection coverage for SD builds and remote deployment.
+- Added an optional, fail-closed StampFly Ecosystem `sf sim`/`sf sils`
+  backend with allow-listed argv, explicit `vpython`/`genesis` backend and
+  `-o` output selection under the workspace `artifacts/` directory, safe
+  `.scn` scenario paths, bounded/redacted output, and simulation-only
+  provenance; `host/flight_sim.py` remains the deterministic local simulator
+  and simulation success is not flight qualification.

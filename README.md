@@ -194,6 +194,36 @@ without opening a camera, serial port, or radio:
 .venv/bin/python host/flight_sim.py --output /tmp/camfly-simulation.jsonl
 ~~~
 
+### Optional StampFly Ecosystem `sf` backend
+
+The external StampFly Ecosystem `sf` package is optional and is not installed,
+built, or downloaded by this repository. When `sf` is available, `host/stampfly_sim.py`
+can run a small allow-listed subset of the documented macOS surfaces:
+`sf sim list`, `sf sim headless [vpython|genesis] -d <seconds> -o <file.sflog.zip>`,
+and `sf sils scenario <path.scn>`. It is a diagnostics/evidence helper only. It
+never opens serial/USB, never calls ARM/disarm/control, runs argv arrays without
+a shell, bounds duration/timeouts and captured output, and records
+`provider=stampfly_ecosystem`, `evidence_kind=simulation`, `simulation=true`,
+`flight_qualified=false`. A successful simulator run is not real-flight
+qualification. The deterministic `host/flight_sim.py` remains the primary
+dependency-free simulator.
+
+Headless runs always pass an explicit `-o` path so the external tool cannot fall
+back to writing inside its own `stampfly_ecosystem/logs` tree. The default is
+`artifacts/stampfly-<backend>-smoke.sflog.zip` under this workspace; the scenario
+argument is a path to a `.scn` file, not a bare scenario name.
+
+~~~sh
+.venv/bin/python -m host.stampfly_sim list
+.venv/bin/python -m host.stampfly_sim headless --duration 5
+.venv/bin/python -m host.stampfly_sim headless --duration 2 --backend genesis \
+  --output artifacts/stampfly-genesis-smoke.sflog.zip
+.venv/bin/python -m host.stampfly_sim --sf /path/to/sf sils-scenario scenarios/hover-1.scn
+~~~
+
+`list` is the default action. Missing `sf`, non-zero exits, and timeouts are
+explicit fail-closed errors.
+
 ## SD runtime deployment
 
 `host/camera_deploy.py` supports explicit `inspect`, `stage`, `activate`,

@@ -1,6 +1,6 @@
 # Open issues — Luna Max execution index
 
-Updated: 2026-09-09
+Updated: 2026-09-14
 
 このディレクトリの issue は **1 issue = 1 Luna Max 実装/検証セッション** を原則とする。親 coordinator から直接実装を始めず、`Luna-Ready` と依存を確認して子 issue を1件だけ選ぶ。
 
@@ -21,6 +21,7 @@ Updated: 2026-09-09
 | [espnow-flight-protocol-core](20260908-espnow-flight-protocol-core.md) | pure wire/session codec/state + tests |
 | [sd-build-failure-hardening](20260908-sd-build-failure-hardening.md) | build failure/signal/concurrency fake tests |
 | [ssh-runtime-deploy-fault-injection](20260908-ssh-runtime-deploy-fault-injection.md) | deploy interruption/concurrency/idempotency fixtures |
+| [stampfly-ecosystem-simulation-sils](20260914-stampfly-ecosystem-simulation-sils.md) | fail-closed optional `sf sim`/`sf sils` backend + provenance |
 
 ## Ready only with explicitly verified hardware
 

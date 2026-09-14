@@ -47,7 +47,13 @@ class FakeSerial:
                 b"roll=0 pitch=0 yaw=0 altitude=0 range=0 altitude_m=0 altitude_valid=0 "
                 b"altitude_age_ms=4294967295 altitude_source=tof_imu range_mm=0 range_valid=0 "
                 b"range_age_ms=4294967295 range_source=tof_bottom imu_valid=0 imu_age_ms=4294967295 "
-                b"imu_source=bmi270 capabilities=telemetry_validity_v1 safe_test=1\r\n"
+                b"imu_source=bmi270 capabilities=telemetry_validity_v1 safe_test=1 "
+                b"status_millis=123 loop_count=456 loop_period_us=2505 sensor_us=1300 sensor_max_us=9000 "
+                b"usb_poll_count=456 usb_command_count=12 tx_dropped=0 tx_deferred=0 tx_pending=0 "
+                b"watchdog_checks=912 watchdog_disarm_count=0 tof_raw_mm=0 tof_ready_status=0 tof_ready=1 "
+                b"tof_raw_stream_status=0 tof_raw_stream=0 tof_get_status=0 tof_restart_status=0 "
+                b"tof_init_clear_status=0 tof_init_start_status=0 tof_objects=0 tof_range_status=255 "
+                b"tof_stream_count=0 tof_data_ready_count=789\r\n"
             )
         elif command in {"CF1 DISARM", "CF1 RELEASE"}:
             self.rx.append(f"CF1 OK {command.split()[1]}\r\n".encode())

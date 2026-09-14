@@ -33,7 +33,9 @@ ALT_MODE_MANUAL = 5
 FIRMWARE_WATCHDOG_SECONDS = 0.250
 DEFAULT_LOCAL_WATCHDOG_SECONDS = 0.200
 MAX_SEQUENCE = 0xFFFFFFFF
-MAX_RX_LINE_BYTES = 512
+# camfly-safe STATUS includes bounded loop, USB, watchdog, and ToF diagnostic
+# fields in addition to the canonical telemetry contract.
+MAX_RX_LINE_BYTES = 2048
 UNKNOWN_TELEMETRY_AGE_MS = 0xFFFFFFFF
 
 _MODE_NAMES = {
@@ -205,7 +207,9 @@ class StampFly:
         port: str,
         *,
         baudrate: int = 115200,
-        response_timeout: float = 0.15,
+        # A full camfly-safe STATUS is larger than one USB packet.  Keep the
+        # bounded parser, but allow the complete line to arrive at 115200.
+        response_timeout: float = 1.0,
         local_watchdog_seconds: float = DEFAULT_LOCAL_WATCHDOG_SECONDS,
         serial_instance: Any | None = None,
         clock: Callable[[], float] = time.monotonic,

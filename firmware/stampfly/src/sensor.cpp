@@ -293,7 +293,9 @@ float sensor_read(void) {
                 altitude_sample_attempted = true;
                 altitude_sample_valid = RawRange > 20 && RawRange < 8190;
                 SensorTelemetryValidity.mark_range(altitude_sample_valid, millis());
+#ifndef CAMFLY_SAFE_TEST
                 if (Mode == PARKING_MODE) RawRangeFront = tof_front_get_range();
+#endif
                 // USBSerial.printf("%9.6f %d\n\r", Elapsed_time, RawRange);
                 if (altitude_sample_valid) {
                     Range = RawRange;

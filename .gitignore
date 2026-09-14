@@ -26,3 +26,4 @@ vendor/atomcam_tools/docker-build_*.log
 
 # macOS
 .DS_Store
+.temote-trace/
